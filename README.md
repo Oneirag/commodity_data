@@ -16,14 +16,16 @@ and indexed by as_of date
 ## Usage
 For downloading and refreshing data
 ```
-from commodity_data.omip import OmipDownloader
+from commodity_data import OmipDownloader
+# or from commodity_data.omip import OmipDownloader
 omip = OmipDownloader()
 omip.download()     # Downloads everything till today
 omip.download("2020-01-01")     # Downloads everything from Jan 1st, 2020
 ```
 For using already downloaded data
 ```
-from commodity_data.omip import OmipDownloader
+from commodity_data import OmipDownloader
+# or from commodity_data.omip import OmipDownloader
 omip = OmipDownloader()
 print(omip.settlement_df) # Actual data. No need to invoke download()
 # Plots evolution of settlement prices and adjusted settlement prices for cal ahead of Spanish power baseload

@@ -41,3 +41,6 @@ ch.setFormatter(formatter)
 
 # add ch to logger
 logger.addHandler(ch)
+
+# Easier to import
+from commodity_data.omip.omip_data import OmipDownloader
