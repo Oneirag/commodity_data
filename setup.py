@@ -5,7 +5,7 @@ setup(
     version='0.1',
     packages=['commodity_data', 'commodity_data.omip'],
     url='',
-    license='GPL',
+    license='GNU GPLv3',
     author='Oscar Neira',
     author_email='oneirag@yahoo.es',
     description='Tool to download commodity prices from Market websites'
