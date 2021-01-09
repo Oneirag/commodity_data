@@ -14,7 +14,7 @@ and indexed by as_of date
 * **type**,  "close" for original prices, adj_close for continuous prices adjusted rolling to next offset at expirations
 
 ## Usage
-For downloading and refreshing data
+####Downloading and refreshing data
 ```
 from commodity_data import OmipDownloader
 # or from commodity_data.omip import OmipDownloader
@@ -22,7 +22,7 @@ omip = OmipDownloader()
 omip.download()     # Downloads everything till today
 omip.download("2020-01-01")     # Downloads everything from Jan 1st, 2020
 ```
-For using already downloaded data
+####Using already downloaded data
 ```
 from commodity_data import OmipDownloader
 # or from commodity_data.omip import OmipDownloader
@@ -33,4 +33,9 @@ import matplotlib.pyplot as plt
 print(omip.settle_xs(market="Omip", commodity="Power", product="Y", offset=1).plot()
 plt.show()
 ```
-
+####Changing default location for files
+Files by default are placed in ~/.ongpi/commodity_data, but this location can be changed in constructor
+```
+from commodity_data import OmipDownloader
+omip = OmipDownloader("my_path")
+```

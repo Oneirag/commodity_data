@@ -19,10 +19,15 @@ def product_to_date(obj, product: str):
 
 class CommodityDownloader:
 
-    def __init__(self):
+    def __init__(self, data_dir=DATA_DIR):
+        """
+        By default files are stored in ~/.ongpi/commodity_data. To make it work in google colab, this
+        parameter can be changed in the constructor
+        :param data_dir: a full path of folder where files will be downloaded. It is passed to os.path.expanduser
+        """
         self.http = http
         self.logger = logger
-        self.DATA_DIR = DATA_DIR
+        self.DATA_DIR = data_dir
         self.date_format = "%Y-%m-%d"
         # Headers for http gets. In case of a log in child classes should define a method for updating it
         self.headers = None
