@@ -16,8 +16,11 @@ class OmipDownloader(CommodityDownloader):
     def file_name(self):
         return "Omip"
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, data_dir=None):
+        if data_dir:
+            super().__init__(data_dir)
+        else:
+            super().__init__()
         # Calculate the absolute minimum date for download
         self.__min_date = min(cdty_cfg['start_t'] for cdty_cfg in OmipConfig.commodity_config.values())
 
