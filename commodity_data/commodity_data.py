@@ -26,7 +26,6 @@ class CommodityDownloader:
         :param data_dir: a full path of folder where files will be downloaded. It is passed to os.path.expanduser
         """
         self.http = http
-        self.logger = logger
         self.DATA_DIR = data_dir
         self.date_format = "%Y-%m-%d"
         # Headers for http gets. In case of a log in child classes should define a method for updating it

@@ -5,9 +5,10 @@ import holidays
 import numpy as np
 import pandas as pd
 
+from commodity_data import logger
 from commodity_data.commodity_data import CommodityDownloader
 from commodity_data.omip import OmipConfig
-from commodity_data.series_config import df_data_columns, df_index_columns
+from commodity_data.series_config import df_index_columns
 
 
 class OmipDownloader(CommodityDownloader):
@@ -26,7 +27,7 @@ class OmipDownloader(CommodityDownloader):
     def _download_date(self, as_of: pd.DataFrame) -> dict:
         dfs = list()
         for cdty, cdty_config in OmipConfig.commodity_config.items():
-            self.logger.info(f"Downloading {cdty} for date {self.as_of_str(as_of)}")
+            logger.info(f"Downloading {cdty} for date {self.as_of_str(as_of)}")
             df = self.__download_omip_data(self.as_of_str(as_of), **cdty_config['download_config'])
             if df is None or df.empty:
                 continue        # Skip if empty or None
@@ -94,7 +95,7 @@ class OmipDownloader(CommodityDownloader):
                 table["close"] = pd.to_numeric(table["Reference prices"], errors='coerce')
                 table = table.dropna(axis=0, how="any")
                 if table.empty:
-                    self.logger.debug(f"No valid data for {as_of}, returning None")
+                    logger.debug(f"No valid data for {as_of}, returning None")
                     return None     # No valid tables found
                 table = table.reset_index()
                 table = table.drop(columns=["Reference prices"])

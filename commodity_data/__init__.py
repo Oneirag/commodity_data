@@ -23,8 +23,6 @@ DATA_DIR = os.path.expanduser("~/.ongpi/commodity_data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # Default logger config
-
-
 # create logger
 logger = logging.getLogger('commodity_data')
 logger.setLevel(logging.DEBUG)
