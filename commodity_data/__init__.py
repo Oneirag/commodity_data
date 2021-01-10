@@ -19,8 +19,7 @@ http.mount("https://", adapter)
 http.mount("http://", adapter)
 
 
-DATA_DIR = os.path.expanduser("~/.ongpi/commodity_data")
-os.makedirs(DATA_DIR, exist_ok=True)
+DATA_DIR = "~/.ongpi/commodity_data"
 
 # Default logger config
 # create logger
