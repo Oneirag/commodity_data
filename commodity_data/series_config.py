@@ -31,6 +31,9 @@ class CommodityCfg:
     def __str__(self):
         return ".".join([self.commodity, self.instrument, self.area])
 
+    def to_dict(self):
+        """Returns a dictionary of the elements of config that are also defined in the columns"""
+        return {k: getattr(self, k) for k in df_index_columns if getattr(self, k, None) is not None}
 
 class InstrumentCfg:
     def __init__(self, product: str, maturity: pd.Timestamp):

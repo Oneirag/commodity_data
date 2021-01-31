@@ -6,12 +6,12 @@ import numpy as np
 import pandas as pd
 
 from commodity_data import logger
-from commodity_data.commodity_data import CommodityDownloader
-from commodity_data.omip import OmipConfig
+from commodity_data.downloaders.base_downloader import BaseDownloader
+from commodity_data.downloaders.omip import OmipConfig
 from commodity_data.series_config import df_index_columns
 
 
-class OmipDownloader(CommodityDownloader):
+class OmipDownloader(BaseDownloader):
 
     def file_name(self):
         return "Omip"
@@ -24,7 +24,7 @@ class OmipDownloader(CommodityDownloader):
     def min_date(self):
         return self.__min_date
 
-    def _download_date(self, as_of: pd.DataFrame) -> dict:
+    def _download_date(self, as_of: pd.DataFrame) -> pd.DataFrame:
         dfs = list()
         for cdty, cdty_config in OmipConfig.commodity_config.items():
             logger.info(f"Downloading {cdty} for date {self.as_of_str(as_of)}")
@@ -39,6 +39,7 @@ class OmipDownloader(CommodityDownloader):
                         df[c] = None
             df['market'] = self.file_name()
             df['type'] = "close"
+
             df = df.drop(columns=['maturity'])
             #df = df.set_index(df_index_columns)
             df = pd.pivot_table(df, values="close", index="as_of", columns=df_index_columns)
@@ -294,6 +295,9 @@ if __name__ == '__main__':
     omip = OmipDownloader()
     print(omip.download(pd.Timestamp(2016, 1, 1)))
     #print(omip.download())
-    omip.settlement_df.xs(["Power", "ES", "Y", 1], level=[])
+    omip.settle_xs(commodity="Power", area="ES", product="Y", offset=1).plot()
+    import matplotlib.pyplot as plt
+    plt.show()
+
 #    update_all()
 #    logger.info("Done")

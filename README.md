@@ -25,12 +25,12 @@ omip.download("2020-01-01")     # Downloads everything from Jan 1st, 2020
 ####Using already downloaded data
 ```
 from commodity_data import OmipDownloader
-# or from commodity_data.omip import OmipDownloader
+# or from commodity_data.downloaders.omip import OmipDownloader
 omip = OmipDownloader()
 print(omip.settlement_df) # Actual data. No need to invoke download()
 # Plots evolution of settlement prices and adjusted settlement prices for cal ahead of Spanish power baseload
 import matplotlib.pyplot as plt
-print(omip.settle_xs(market="Omip", commodity="Power", product="Y", offset=1).plot()
+omip.settle_xs(market="Omip", commodity="Power", product="Y", offset=1).plot()
 plt.show()
 ```
 ####Changing default location for files

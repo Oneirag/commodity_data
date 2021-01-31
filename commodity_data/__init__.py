@@ -2,7 +2,6 @@
 Global configurations
 """
 import requests
-import os
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 import logging
@@ -40,4 +39,4 @@ ch.setFormatter(formatter)
 logger.addHandler(ch)
 
 # Easier to import
-from commodity_data.omip.omip_data import OmipDownloader
+from commodity_data.downloaders import *

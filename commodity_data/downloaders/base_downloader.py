@@ -17,7 +17,7 @@ def product_to_date(obj, product: str):
     return getattr(obj, freqs[product])
 
 
-class CommodityDownloader:
+class BaseDownloader:
 
     def __init__(self, data_dir: str = None):
         """
@@ -31,6 +31,8 @@ class CommodityDownloader:
         self.date_format = "%Y-%m-%d"
         # Headers for http gets. In case of a log in child classes should define a method for updating it
         self.headers = None
+        # Cookies for http gets. In case of a log in child classes should define a method for updating it
+        self.cookies = None
 
         # Filenames for persistent storage
         self.settlement_filename = os.path.join(self.DATA_DIR, self.file_name() + ".pkl")
@@ -39,6 +41,7 @@ class CommodityDownloader:
         else:
             self.settlement_df = pd.DataFrame(columns=pd.MultiIndex.from_arrays([[]] * len(df_index_columns),
                                                                                 names=df_index_columns))
+        self.cache = {}
         pass
 
     @abc.abstractmethod
@@ -67,10 +70,10 @@ class CommodityDownloader:
         end_date = pd.Timestamp(end_date or pd.Timestamp.today().normalize())
         ecb_hols = holidays.EuropeanCentralBank(years=range(start_date.year, end_date.year + 1))
         as_of_dates = pd.bdate_range(start_date, end_date, holidays=ecb_hols, freq="C")
-        pool = multiprocessing.Pool(4)
         # Chunked in months (20 Business days aprox)
         for as_of_chunk in np.array_split(as_of_dates, 20):
-            dfs = list(pool.map(self._download_date,
+            map_func = map if self.cache else multiprocessing.Pool(4).map
+            dfs = list(map_func(self._download_date,
                                 (as_of for as_of in as_of_chunk if as_of not in self.settlement_df.index)))
             dfs = tuple(df for df in dfs if df is not None)     # Remove None entries
             if dfs:
@@ -78,8 +81,7 @@ class CommodityDownloader:
                 # Persist Data to hdfs. This is the not-thread-safe part
                 self.settlement_df = self.settlement_df.append(dfs)
                 self.dump()
-        if retval or True:
-            pass
+        if retval:
             self.roll_expiration()
         return retval
 
@@ -145,7 +147,7 @@ class CommodityDownloader:
         return None
 
     @abc.abstractmethod
-    def _download_date(self, as_of: pd.DataFrame) -> dict:
+    def _download_date(self, as_of: pd.DataFrame) -> pd.DataFrame:
         return None
 
     def as_of_str(self, as_of):
@@ -155,14 +157,15 @@ class CommodityDownloader:
         else:
             return as_of.strftime(self.date_format)
 
-    def http_get(self, url: str):
+    def http_get(self, url: str, params=None):
         """
         Performs an http get. Tries to perform it with validation and retries without validation on case of erro
         :param url: the url to get
+        :param params: (optional) the parameters of the url
         :return: a requests object
         """
         try:
-            req = self.http.get(url, headers=self.headers)
+            req = self.http.get(url, headers=self.headers, cookies=self.cookies, params=params)
         except Exception as e:
-            req = self.http.get(url, headers=self.headers, verify=False)
+            req = self.http.get(url, headers=self.headers, cookies=self.cookies, params=params, verify=False)
         return req
