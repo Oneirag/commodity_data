@@ -3,41 +3,71 @@ Configuration for a simple commodity series and instruments
 Examples:
     market commodity   instrument  Area            Product     Maturity
     Omip    Power       Base/Peak   Es/Pt/De/Fr     M/W/Y/Q     ---
-    Omip    Emissions   EUA         Eu              Dec         ---
+    Omip    Emissions   EUA         Eu              Y           ---
     Omip    Gas         Base        Es              MQY         ---
 """
-import pandas as pd
+import datetime
+from dataclasses import field
+from enum import Enum
+
+from marshmallow.validate import OneOf
+from marshmallow_dataclass import dataclass
+
+valid_product = "YMQD"
 
 df_index_columns = ["market",  # market from which data is downloaded (Omip, ICE...)
                     "commodity",  # Generic name of commodity (Power, Gas, CO2....)
                     "instrument",  # BL (baseload)/PK (peak load), EUA...
                     "area",  # Country
                     "product",  # D/W/M/Q/Y for calendar day/week/month/quarter/year
-#                    "maturity",  # Maturity of the product (start date of delivery)
                     "offset",  # Number of calendar products of interval from as_of date till maturity
-                    "type",     # close, adj_close...
+                    "type",     # From TypeColumn
                     ]
-df_data_columns = ["close",  # Original settlement price
-                   "adj_close"  # Adjusted settlement price (taking into account product rolling)
-                   ]
 
 
+class TypeColumn(str, Enum):
+    close = "close"             # Original settlement price
+    adj_close = "adj_close"     # Adjusted settlement price (taking into account product rolling)
+
+
+@dataclass
 class CommodityCfg:
-    def __init__(self, commodity: str, instrument: str, area: str):
-        self.commodity = commodity
-        self.instrument = instrument
-        self.area = area
-
-    def __str__(self):
-        return ".".join([self.commodity, self.instrument, self.area])
+    commodity: str
+    instrument: str
+    area: str = ""
 
 
-class InstrumentCfg:
-    def __init__(self, product: str, maturity: pd.Timestamp):
-        self.product = product
-        if product not in "YMQD":
-            raise ValueError(f"Product {product} not understood")
-        self.maturity = maturity
+@dataclass
+class _OmipDownloadConfig:
+    instrument: str
+    zone: str
+    start_t: datetime.date
+    product: str
 
-    def __str__(self):
-        return ".".join([self.product, self.date.strftime("%Y-%M-%d")])
+
+@dataclass
+class _BarchartDownloadConfig:
+    symbol: str
+    product: str = field(default="D", metadata={"validate": OneOf(valid_product)})
+    expiry: datetime.date = field(default=None)
+
+
+@dataclass
+class BarchartConfig:
+    commodity_cfg: CommodityCfg
+    download_cfg: _BarchartDownloadConfig
+
+    def id(self) -> str:
+        return self.download_cfg.symbol
+
+    def to_dict(self):
+        """Returns a dictionary of the elements of config that are also defined in the columns"""
+        return {k: getattr(self, k) for k in df_index_columns if getattr(self, k, None) is not None}
+
+@dataclass
+class OmipConfig:
+    commodity_cfg: CommodityCfg
+    download_cfg: _OmipDownloadConfig
+
+    def id(self) -> str:
+        return ",".join([self.download_cfg.instrument, self.download_cfg.product, self.download_cfg.zone])
