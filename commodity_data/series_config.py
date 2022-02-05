@@ -60,9 +60,6 @@ class BarchartConfig:
     def id(self) -> str:
         return self.download_cfg.symbol
 
-    def to_dict(self):
-        """Returns a dictionary of the elements of config that are also defined in the columns"""
-        return {k: getattr(self, k) for k in df_index_columns if getattr(self, k, None) is not None}
 
 @dataclass
 class OmipConfig:
