@@ -14,6 +14,3 @@ marshmallow-dataclass      # For validation of json schemas for configuration
 marshmallow
 
 pyotp       # for using google authenticator passwords
-
-
-

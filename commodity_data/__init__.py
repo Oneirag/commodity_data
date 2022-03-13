@@ -17,4 +17,3 @@ if __name__ == '__main__':
         set_password(service_name, "proxy_username")
         print(get_password(service_name, "proxy_username"))
 
-
