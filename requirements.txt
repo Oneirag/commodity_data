@@ -13,5 +13,7 @@ ong_tsdb@git+https://github.com/Oneirag/ong_tsdb.git
 marshmallow-dataclass      # For validation of json schemas for configuration
 marshmallow
 
+pyotp       # for using google authenticator passwords
+
 
 

@@ -1,5 +1,5 @@
 import abc
-from commodity_data import http, logger, config
+from commodity_data import http, logger, config, get_password
 from ong_tsdb.client import OngTsdbClient
 from ong_utils import is_debugging, cookies2header
 import numpy as np
@@ -7,8 +7,26 @@ import pandas as pd
 import holidays
 from commodity_data.series_config import df_index_columns, TypeColumn
 import multiprocessing.pool
+import pyotp
+import time
 
 pd.options.mode.chained_assignment = 'raise'  # Raises SettingWithCopyWarning error instead of just warning
+
+
+class GoogleAuth(pyotp.TOTP):
+    last_otp = ""
+
+    def now(self) -> str:
+        """Returns a TOTP code, preventing reuse (waits for a new one if needed)"""
+        otp = super().now()
+        if otp == GoogleAuth.last_otp:
+            logger.info("Waiting for new MFA code...")
+            while super().now() == GoogleAuth.last_otp:
+                time.sleep(1)
+            logger.info("New MFA code generated")
+        otp = super().now()
+        GoogleAuth.last_otp = otp
+        return otp
 
 
 def product_to_date(obj, product: str):
@@ -20,7 +38,7 @@ def product_to_date(obj, product: str):
     return getattr(obj, freqs[product])
 
 
-def combine_config(default_config: list, config: list, parser, use_default: bool=True) -> list:
+def combine_config(default_config: list, config: list, parser, use_default: bool = True) -> list:
     """
     Returns a list of parsed values from a combination of default_config and config, depending on parameters
     :param default_config: required, the default configuration (a list of dicts)
@@ -66,8 +84,11 @@ class BaseDownloader:
         self.cookies = None
         self.logger = logger
         # Configuration of ong_tsdb database
-        self._db_client_admin = OngTsdbClient(config("url"), config("admin_token"))
-        self._db_client_write = OngTsdbClient(config("url"), config("write_token"))
+        self.otp = GoogleAuth(get_password("service_name_google_auth", "proxy_username"))
+        self._db_client_admin = OngTsdbClient(config("url"), config("admin_token"), retry_connect=1, retry_total=1,
+                                              proxy_auth_body=self.proxy_auth_dict())
+        self._db_client_write = None
+
         if not self._db_client_admin.exist_db(self.database):
             self._db_client_admin.create_db(self.database)
         if not self._db_client_admin.exist_sensor(self.database, self.name()):
@@ -83,6 +104,23 @@ class BaseDownloader:
         self.last_data_ts = self.date_last_data_ts()
         pass
 
+    def proxy_auth_dict(self) -> dict:
+        """Returns proxy auth dict, including MFA Code"""
+        mfa_code = self.otp.now()
+        proxy_auth_dict = dict(username=config("proxy_username"),
+                               password=get_password("service_name_proxy", "proxy_username"),
+                               mfa_code=mfa_code)
+        return proxy_auth_dict
+
+    @property
+    def db_client_write(self) -> OngTsdbClient:
+        """Returns a client to write, by reusing and destroying admin client"""
+        if self._db_client_write is None:
+            self._db_client_admin.update_token(config("write_token"))
+            self._db_client_write = self._db_client_admin
+            self._db_client_admin = None
+        return self._db_client_write
+
     @property
     def settlement_df(self):
         if self.__settlement_df is None:
@@ -92,7 +130,7 @@ class BaseDownloader:
     def date_last_data_ts(self):
         """Returns last date (for any data in current database)"""
         # Admin client must be used, as it fails if sensor does not exist so there are no permissions for getting date
-        last_date = self._db_client_admin.get_lastdate(self.database, self.name())
+        last_date = self.db_client_write.get_lastdate(self.database, self.name())
         if last_date is None:
             return None
         return last_date
@@ -164,7 +202,7 @@ class BaseDownloader:
         """Saves settlement_df to database"""
         self.__settlement_df = self.__settlement_df.sort_index()
         # write to database
-        retval = self._db_client_write.write_df(self.database, self.name(), self.__settlement_df)
+        retval = self.db_client_write.write_df(self.database, self.name(), self.__settlement_df)
         if not retval:
             self.logger.warning("Could not dump data")
         return retval
@@ -176,7 +214,7 @@ class BaseDownloader:
                                                                                   names=df_index_columns))
         else:
             # Reads EVERYTHING in memory converted to float64!!!
-            self.__settlement_df = self._db_client_write.read(self.database, self.name(), self.min_date()). \
+            self.__settlement_df = self.db_client_write.read(self.database, self.name(), self.min_date()). \
                 astype(np.float64)
 
     def roll_expiration(self, roll_offset=0) -> None:

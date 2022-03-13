@@ -9,7 +9,7 @@ if __name__ == '__main__':
     mpld3_port = 9999
     omip = OmipDownloader()
     omip.download("2020-01-01")
-    omip = OmipDownloader()
+    # omip = OmipDownloader()
     print(omip.settlement_df)  # Actual data. No need to invoke download()
 
     for product in "YMQD":
