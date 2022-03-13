@@ -5,7 +5,7 @@ with open('requirements.txt') as f:
 
 setup(
     name='commodity_data',
-    version='0.2.0',
+    version='0.2.1',
     packages=['commodity_data', 'commodity_data.downloaders'],
     url='https://github.com/Oneirag/commodity_data.git',
     license='GNU GPLv3',
