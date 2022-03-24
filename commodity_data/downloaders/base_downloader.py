@@ -191,7 +191,7 @@ class BaseDownloader:
             if dfs:
                 retval += len(dfs)
                 # Persist Data to hdfs. This is the not-thread-safe part
-                self.__settlement_df = self.settlement_df.append(dfs)
+                self.__settlement_df = pd.concat([self.settlement_df, dfs])
                 self.dump()
         if retval:
             self.logger.info(f"Adjusting expirations for {self.__class__.__name__} {self.name()}")
