@@ -84,7 +84,10 @@ class BaseDownloader:
         self.cookies = None
         self.logger = logger
         # Configuration of ong_tsdb database
-        self.otp = GoogleAuth(get_password("service_name_google_auth", "proxy_username"))
+        if config("service_name_google_auth", None) is not None:
+            self.otp = GoogleAuth(get_password("service_name_google_auth", "proxy_username"))
+        else:
+            self.otp = None
         self._db_client_admin = OngTsdbClient(config("url"), config("admin_token"), retry_connect=1, retry_total=1,
                                               proxy_auth_body=self.proxy_auth_dict())
         self._db_client_write = None
@@ -106,6 +109,8 @@ class BaseDownloader:
 
     def proxy_auth_dict(self) -> dict:
         """Returns proxy auth dict, including MFA Code"""
+        if self.otp is None:
+            return None
         mfa_code = self.otp.now()
         proxy_auth_dict = dict(username=config("proxy_username"),
                                password=get_password("service_name_proxy", "proxy_username"),
@@ -191,7 +196,7 @@ class BaseDownloader:
             if dfs:
                 retval += len(dfs)
                 # Persist Data to hdfs. This is the not-thread-safe part
-                self.__settlement_df = self.settlement_df.append(dfs)
+                self.__settlement_df = pd.concat([self.settlement_df, *dfs])
                 self.dump()
         if retval:
             self.logger.info(f"Adjusting expirations for {self.__class__.__name__} {self.name()}")
