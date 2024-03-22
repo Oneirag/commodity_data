@@ -43,7 +43,7 @@ def combine_config(default_config: list, config: list, parser, use_default: bool
     Returns a list of parsed values from a combination of default_config and config, depending on parameters
     :param default_config: required, the default configuration (a list of dicts)
     :param config: optional list of dicts. If null, default_config will be used.If not null, behaviour depends
-    on the vaules of replace param
+    on the values of replace param
     :param parser: a parser to convert dict elements of list into objects
     :param use_default: if False, values in config will be used and default_config will be ignored. If True (default),
     values of config will overwrite values in default_config that matches the same id()
@@ -107,7 +107,7 @@ class BaseDownloader:
         self.last_data_ts = self.date_last_data_ts()
         pass
 
-    def proxy_auth_dict(self) -> dict:
+    def proxy_auth_dict(self) -> dict | None:
         """Returns proxy auth dict, including MFA Code"""
         if self.otp is None:
             return None
@@ -210,6 +210,7 @@ class BaseDownloader:
         retval = self.db_client_write.write_df(self.database, self.name(), self.__settlement_df)
         if not retval:
             self.logger.warning("Could not dump data")
+            self.logger.warning("Try to update proxy password using set_proxy_user_password() of __init__")
         return retval
 
     def load(self):
@@ -262,7 +263,7 @@ class BaseDownloader:
                 expirations = np.argwhere(np.diff(product_to_date(df_prod_0.index, product)) != 0).flatten()
 
                 # df_prod_1 should not have nans, so fill them
-                roll_values = roll(df_prod_0.values, df_prod_1.fillna(method="ffill").values, expirations, roll_offset)
+                roll_values = roll(df_prod_0.values, df_prod_1.ffill().values, expirations, roll_offset)
 
                 df_roll = pd.Series(roll_values, index=df_prod_0.index,
                                     name=column_idx(index, df_index_columns, offset=offset,
