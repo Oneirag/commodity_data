@@ -5,6 +5,7 @@ import time
 import holidays
 import marshmallow_dataclass
 import numpy as np
+import ong_tsdb.exceptions
 import pandas as pd
 import pyotp
 from ong_tsdb.client import OngTsdbClient
@@ -133,6 +134,7 @@ class BaseDownloader(HttpGet):
         """Deletes the whole remote database. Ask for confirmation"""
         if do_not_ask or ("yes" == input(f"Type 'yes' if you are sure to delete all {self.name()} data: ")):
             if self.db_client_admin().delete_sensor(self.database, self.name()):
+                self.logger.info(f"Deleted all market data for '{self.name()}' from database '{self.database}'")
                 self.db_client_admin(force_reload=True)  # This recreates bd from scratch
             else:
                 self.logger.warning(f"Could not delete market data '{self.name()}' from database '{self.database}'")
@@ -170,10 +172,19 @@ class BaseDownloader(HttpGet):
     def db_client_admin(self, force_reload: bool = False) -> OngTsdbClient:
         """Creates a new admin client. If it is the first time or force_reload=False, creates the client,
         the database and all the sensors"""
+
+        def create_client() -> OngTsdbClient:
+            return OngTsdbClient(config("url"), config("admin_token"), retry_connect=1,
+                                 retry_total=1, proxy_auth_body=self.proxy_auth_dict())
+
         if self._db_client is None or force_reload:
             if not self._db_client:
-                self._db_client = OngTsdbClient(config("url"), config("admin_token"), retry_connect=1,
-                                                retry_total=1, proxy_auth_body=self.proxy_auth_dict())
+                try:
+                    self._db_client = create_client()
+                except ong_tsdb.exceptions.ProxyNotAuthorizedException:
+                    self.logger.info("Could get proxy authorization, retrying")
+                    # Try again
+                    self._db_client = create_client()
             else:
                 self._db_client.update_token((config("admin_token")))
             if not self._db_client.exist_db(self.database):
@@ -234,11 +245,13 @@ class BaseDownloader(HttpGet):
                              f"with available values {values_failed_level}. "
                              f"Key was found in level {level_failed_key}") from None
 
-    def download(self, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None) -> int:
+    def download(self, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None,
+                 force_download: bool = False) -> int:
         """
         Downloads and stores data from a start date to an end date
         :param start_date:
         :param end_date:
+        :param force_download: True to force download again data. Defaults to False (avoid downloading again)
         :return: the number of downloaded days
         """
         retval = 0
@@ -253,26 +266,33 @@ class BaseDownloader(HttpGet):
             map_func = map if self.cache is not None or is_debugging() else multiprocessing.pool.ThreadPool(4).map
             # map_func = map      # No multiprocessing
             dfs = list(map_func(self._download_date,
-                                (as_of for as_of in as_of_chunk if as_of not in self.settlement_df.index)))
+                                (as_of for as_of in as_of_chunk
+                                 if force_download or as_of not in self.settlement_df.index)))
             dfs = tuple(df for df in dfs if df is not None)  # Remove None entries
             if dfs:
                 retval += len(dfs)
                 # Persist Data to hdfs. This is the not-thread-safe part
-                self.__settlement_df = pd.concat([self.settlement_df, *dfs])
-                self.dump()
+                new_data = pd.concat(dfs)
+                if self.__settlement_df is not None:
+                    self.__settlement_df.update(new_data)
+                    self.__settlement_df.sort_index()
+                else:
+                    self.__settlement_df = new_data
+                self.dump(new_data)
         if retval:
             self.logger.info(f"Adjusting expirations for {self.__class__.__name__} {self.name()}")
             self.roll_expiration()
         return retval
 
-    def dump(self) -> bool:
-        """Saves settlement_df to database"""
-        self.__settlement_df = self.__settlement_df.sort_index()
+    def dump(self, df: pd.DataFrame = None) -> bool:
+        """Saves give df to database. If None, self.__settlement_df will be saved"""
+        if df is None:
+            df = self.__settlement_df.sort_index()
         # write to database
-        retval = self.db_client_write.write_df(self.database, self.name(), self.__settlement_df)
+        retval = self.db_client_write.write_df(self.database, self.name(), df)
         if not retval:
-            self.logger.warning("Could not dump data")
-            self.logger.warning("Try to update proxy password using set_proxy_user_password() of __init__")
+            self.logger.error("Could not dump data")
+            self.logger.info("Try to update proxy password using set_proxy_user_password() of __init__")
         return retval
 
     def load(self):
@@ -334,7 +354,7 @@ class BaseDownloader(HttpGet):
 
         # Append all rollings at the same time to avoid performance warning due to heavy fragmentation
         self.__settlement_df = pd.concat([self.settlement_df, *df_rolls], axis=1)
-        self.dump()
+        self.dump(self.__settlement_df)  # Full dump due to rolling adjustments
         return None
 
     @abc.abstractmethod

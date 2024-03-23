@@ -50,13 +50,11 @@ class OmipDownloader(BaseDownloader):
             return None
 
 
-
-
-
-
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     omip = OmipDownloader()
+    # Force download last two days
+    print(omip.download(pd.Timestamp.today().normalize() - pd.offsets.BDay(2), force_download=True))
     omip.load()
     omip.settle_xs(commodity="Power", area="ES", product="Y", offset=1).plot()
     plt.show()

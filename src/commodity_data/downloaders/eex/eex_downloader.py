@@ -31,7 +31,7 @@ class EEXDownloader(BaseDownloader):
             table = table[['close']]
             all_tables.append(table)
         df_retval = pd.concat(all_tables)
-        df_retval.T
+        df_retval = df_retval.T
         df_retval['as_of'] = as_of
         df_retval.set_index("as_of", inplace=True)
         return df_retval
@@ -44,4 +44,4 @@ class EEXDownloader(BaseDownloader):
 if __name__ == '__main__':
     eex = EEXDownloader()
     eex.delete_all_data()
-    eex.download(start_date=pd.Timestamp(2024, 3, 18))
+    eex.download(start_date=pd.Timestamp(2024, 3, 18), force_download=True)
