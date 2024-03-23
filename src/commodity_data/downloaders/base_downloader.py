@@ -75,6 +75,7 @@ def combine_config(default_config: list, config: list, parser, use_default: bool
 
 class HttpGet:
     """Class that adds http_get functionality for downloading and connecting"""
+
     def __init__(self):
         self.http = http
         self.headers = None
@@ -119,26 +120,22 @@ class BaseDownloader(HttpGet):
             self.otp = GoogleAuth(get_password("service_name_google_auth", "proxy_username"))
         else:
             self.otp = None
-        self._db_client_admin = OngTsdbClient(config("url"), config("admin_token"), retry_connect=1, retry_total=1,
-                                              proxy_auth_body=self.proxy_auth_dict())
-        self._db_client_write = None
-
-        if not self._db_client_admin.exist_db(self.database):
-            self._db_client_admin.create_db(self.database)
-        if not self._db_client_admin.exist_sensor(self.database, self.name()):
-            self._db_client_admin.create_sensor(self.database, self.name(), self.period, [],
-                                                config("read_token"), config("write_token"),
-                                                level_names=df_index_columns)
-        else:
-            if not self._db_client_admin.get_metadata(self.database, self.name()):
-                self._db_client_admin.set_level_names(self.database, self.name(), df_index_columns)
-        self._db_client_admin.config_reload()  # Forces config reload in case external changes found
+        self._db_client = None
+        self.db_client_admin()  # Forces creation of database, sensors...
         self.__settlement_df = None
         self.cache = None
         self.last_data_ts = self.date_last_data_ts()
         self.config = None
         self.create_config(config_name, class_schema, default_config_field)
         pass
+
+    def delete_all_data(self, do_not_ask: bool = False):
+        """Deletes the whole remote database. Ask for confirmation"""
+        if do_not_ask or ("yes" == input(f"Type 'yes' if you are sure to delete all {self.name()} data: ")):
+            if self.db_client_admin().delete_sensor(self.database, self.name()):
+                self.db_client_admin(force_reload=True)  # This recreates bd from scratch
+            else:
+                self.logger.warning(f"Could not delete market data '{self.name()}' from database '{self.database}'")
 
     def create_config(self, config_field: str, class_schema, default_config_field: str):
         # cfg = config("omip_downloader", dict())
@@ -166,11 +163,30 @@ class BaseDownloader(HttpGet):
     @property
     def db_client_write(self) -> OngTsdbClient:
         """Returns a client to write, by reusing and destroying admin client"""
-        if self._db_client_write is None:
-            self._db_client_admin.update_token(config("write_token"))
-            self._db_client_write = self._db_client_admin
-            self._db_client_admin = None
-        return self._db_client_write
+        if self._db_client is None:
+            self.db_client_admin().update_token(config("write_token"))
+        return self._db_client
+
+    def db_client_admin(self, force_reload: bool = False) -> OngTsdbClient:
+        """Creates a new admin client. If it is the first time or force_reload=False, creates the client,
+        the database and all the sensors"""
+        if self._db_client is None or force_reload:
+            if not self._db_client:
+                self._db_client = OngTsdbClient(config("url"), config("admin_token"), retry_connect=1,
+                                                retry_total=1, proxy_auth_body=self.proxy_auth_dict())
+            else:
+                self._db_client.update_token((config("admin_token")))
+            if not self._db_client.exist_db(self.database):
+                self._db_client.create_db(self.database)
+            if not self._db_client.exist_sensor(self.database, self.name()):
+                self._db_client.create_sensor(self.database, self.name(), self.period, [],
+                                              config("read_token"), config("write_token"),
+                                              level_names=df_index_columns)
+            else:
+                if not self._db_client.get_metadata(self.database, self.name()):
+                    self._db_client.set_level_names(self.database, self.name(), df_index_columns)
+            self._db_client.config_reload()  # Forces config reload in case external changes found
+        return self._db_client
 
     @property
     def settlement_df(self):
@@ -331,8 +347,6 @@ class BaseDownloader(HttpGet):
             return as_of
         else:
             return as_of.strftime(self.date_format)
-
-
 
 
 def consecutive(data, stepsize=1):

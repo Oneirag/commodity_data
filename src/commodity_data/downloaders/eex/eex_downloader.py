@@ -42,12 +42,6 @@ class EEXDownloader(BaseDownloader):
 
 
 if __name__ == '__main__':
-    # as_of_date = pd.Timestamp(2023,3, 13)
-    # for product in "M", "Q":
-    #     for expiry in "2023-4-1", "2023-5-1", "2023-6-1", "2023-12-1", "2024-1-1", "2024-2-1", "2024-3-1":
-    #         print(expiry, date_offset(as_of_date, pd.Timestamp(expiry), product))
-    # exit(0)
-    for delivery, period in [("2023-03-04", "W"), ("2023-03-11", "W")]:
-        print(delivery, period, date_offset(pd.Timestamp(2023, 3, 5), pd.Timestamp(delivery), period))
     eex = EEXDownloader()
-    eex.download(start_date=pd.Timestamp(2024, 1, 1))
+    eex.delete_all_data()
+    eex.download(start_date=pd.Timestamp(2024, 3, 18))

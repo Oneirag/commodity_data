@@ -140,15 +140,21 @@ default_config = {
         },
     ],
     "EEX": [
-        {
-            # for spanish monthly data
-            "download_cfg": {
-                "instrument": "/E.FEBM", "product": "M", "zone": "ES",
-            },
-            "commodity_cfg": {
-                "commodity": "Power", "instrument": "BL", "area": "ES",
-            },
-        }
-
+        *[
+            {
+                "download_cfg": {
+                    "instrument": instrument, "product": product, "zone": "ES",
+                },
+                "commodity_cfg": {
+                    "commodity": "Power", "instrument": "BL", "area": "ES",
+                },
+            }
+            for instrument, product in [
+                ("/E.FEBY", "Y"),        # Spanish Baseload year
+                ("/E.FEBM", "M"),        # Spanish Baseload month
+                ("/E.FEBQ", "Q"),        # Spanish Baseload Quarter
+                ("/E.FE_DAILY", "D"),    # Spanish Baseload Day
+            ]
+        ]
     ]
 }
