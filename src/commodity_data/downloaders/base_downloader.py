@@ -1,16 +1,27 @@
 import abc
-from commodity_data import http, logger, config, get_password
-from ong_tsdb.client import OngTsdbClient
-from ong_utils import is_debugging, cookies2header
-import numpy as np
-import pandas as pd
-import holidays
-from commodity_data.series_config import df_index_columns, TypeColumn
 import multiprocessing.pool
-import pyotp
 import time
 
+import holidays
+import marshmallow_dataclass
+import numpy as np
+import pandas as pd
+import pyotp
+from ong_tsdb.client import OngTsdbClient
+from ong_utils import is_debugging, cookies2header
+
+from commodity_data import config
+from commodity_data import http, logger, get_password
+from commodity_data.downloaders.default_config import default_config
+from commodity_data.series_config import df_index_columns, TypeColumn
+
 pd.options.mode.chained_assignment = 'raise'  # Raises SettingWithCopyWarning error instead of just warning
+
+# To convert standard frequencies into products
+freqs = dict(Y="year",
+             Q="quarter",
+             M="month",
+             D="day")
 
 
 class GoogleAuth(pyotp.TOTP):
@@ -31,10 +42,7 @@ class GoogleAuth(pyotp.TOTP):
 
 def product_to_date(obj, product: str):
     """Transforms product as string (Y/M/Q/D) into functions call to datetime objects"""
-    freqs = dict(Y="year",
-                 Q="quarter",
-                 M="month",
-                 D="day")
+
     return getattr(obj, freqs[product])
 
 
@@ -65,23 +73,46 @@ def combine_config(default_config: list, config: list, parser, use_default: bool
     return list({**dict_default, **dict_config}.values())
 
 
-class BaseDownloader:
+class HttpGet:
+    """Class that adds http_get functionality for downloading and connecting"""
+    def __init__(self):
+        self.http = http
+        self.headers = None
+        self.cookies = None
+
+    def http_get(self, url: str, params=None):
+        """
+        Performs a http get. Tries to perform it with validation and retries without validation on case of error
+        :param url: the url to get
+        :param params: (optional) the parameters of the url
+        :return: a requests object
+        """
+        headers = self.headers or dict()
+        if self.cookies:
+            cookies = cookies2header(cookies=self.cookies)
+            headers.update(cookies)
+        req = self.http.request("get", url, headers=headers, fields=params)
+        if req.status >= 399:
+            raise ConnectionError(f"Could not connect to {url}. Received status {req.status}: {req.reason}")
+        return req
+
+
+class BaseDownloader(HttpGet):
     period = "1D"
     database = "commodity_data"
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, config_name: str, class_schema, default_config_field: str):
         """
         Initializes the Downloader, creating clients using configuration. It needs url, host, admin_token, write_token
         and read_token keys
         :param name: Name of the sensor that will be created to store data
+        :param config_name: default config name in the config file
+        :param class_schema: class used to parse the configuration
+        :param default_config_field: name for default config field
         """
+        super().__init__()
         self.__name = name
-        self.http = http
         self.date_format = "%Y-%m-%d"
-        # Headers for http gets, child classes should define a method for updating it
-        self.headers = None
-        # Cookies for http gets, child classes should define a method for updating it
-        self.cookies = None
         self.logger = logger
         # Configuration of ong_tsdb database
         if config("service_name_google_auth", None) is not None:
@@ -105,7 +136,22 @@ class BaseDownloader:
         self.__settlement_df = None
         self.cache = None
         self.last_data_ts = self.date_last_data_ts()
+        self.config = None
+        self.create_config(config_name, class_schema, default_config_field)
         pass
+
+    def create_config(self, config_field: str, class_schema, default_config_field: str):
+        # cfg = config("omip_downloader", dict())
+        # omip_parser = marshmallow_dataclass.class_schema(OmipConfig)()
+        # self.config = combine_config(omip_cfg, cfg, omip_parser,
+        #                              use_default=config("omip_downloader_use_default", True))
+        if not self.name() in default_config:
+            raise ValueError(f"Could not find {self.name()} in default configuration")
+        base_config = default_config[self.name()]
+        cfg = config(config_field, dict())
+        parser = marshmallow_dataclass.class_schema(class_schema)()
+        self.config = combine_config(base_config, cfg, parser,
+                                     use_default=config(default_config_field, True))
 
     def proxy_auth_dict(self) -> dict | None:
         """Returns proxy auth dict, including MFA Code"""
@@ -286,19 +332,7 @@ class BaseDownloader:
         else:
             return as_of.strftime(self.date_format)
 
-    def http_get(self, url: str, params=None):
-        """
-        Performs a http get. Tries to perform it with validation and retries without validation on case of error
-        :param url: the url to get
-        :param params: (optional) the parameters of the url
-        :return: a requests object
-        """
-        headers = self.headers or dict()
-        if self.cookies:
-            cookies = cookies2header(cookies=self.cookies)
-            headers.update(cookies)
-        req = self.http.request("get", url, headers=headers, fields=params)
-        return req
+
 
 
 def consecutive(data, stepsize=1):

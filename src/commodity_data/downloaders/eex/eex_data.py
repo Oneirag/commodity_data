@@ -3,16 +3,15 @@ File to read futures data from eex web site
 """
 import json
 import re
-from datetime import date
 from pathlib import Path
 from typing import List
 
 import pandas
 import pandas as pd
-import requests
 from bs4 import BeautifulSoup
 
 from commodity_data import logger
+from commodity_data.downloaders.base_downloader import HttpGet
 
 
 def get_js_var(var_name: str, where: str) -> str:
@@ -25,7 +24,7 @@ def get_js_var(var_name: str, where: str) -> str:
     return ""
 
 
-class EEX_Data:
+class EEXData(HttpGet):
     """Class to get market data from eex"""
 
     format_year_month_day = "%Y/%m/%d"        # Date format of other date: year/month/day
@@ -38,6 +37,7 @@ class EEX_Data:
         Init the EEX Data class, reloading product configuration data from cache if possible
         :param force_download_config: ignore product configuration cache and force data reloading
         """
+        super().__init__()
         self.logger = logger
         cache = self.load_check_cache() if not force_download_config else dict()
         self.cache_valid = cache.get('valid', False)
@@ -46,7 +46,7 @@ class EEX_Data:
         self.logger.debug(self.market_config_df.to_string())
 
     def js_request_results(self, url: str, params: dict, headers: dict = None) -> dict:
-        default_headers = {
+        self.headers = {
             # 'Accept': '*/*',
             # 'Accept-Language': 'es-ES,es;q=0.6',
             # 'Cache-Control': 'no-cache',
@@ -56,10 +56,12 @@ class EEX_Data:
             'Referer': 'https://www.eex.com/',
         }
         if headers:
-            default_headers.update(headers)
-        response = requests.get(url, params, headers=default_headers)
-        response.raise_for_status()
-        return response.json()['results']
+            self.headers.update(headers)
+        response = self.http_get(url=url, params=params)
+        return json.loads(response.data)['results']
+        # response = requests.get(url, params, headers=default_headers)
+        # response.raise_for_status()
+        # return response.json()['results']
 
     def load_check_cache(self, max_old_days: int = 1) -> dict:
         """Checks if cache file exists and is less than 1 day old. Returns a dict with fields "valid", a boolean
@@ -94,8 +96,8 @@ class EEX_Data:
         for commodity in self.commodities:
             # commodity: power, gas...
             self.logger.debug(f"Reading {commodity} futures data")
-            res = requests.get(f"https://www.eex.com/en/market-data/{commodity}/futures")
-            soup = BeautifulSoup(res.text, features="lxml")
+            res = self.http_get(f"https://www.eex.com/en/market-data/{commodity}/futures")
+            soup = BeautifulSoup(res.data, features="lxml")
             picker = soup.find(id="snippetpicker")
             # find options among the options of the picker
             options = {op.text.strip(): op.attrs['value'] for op in picker.find_all("option")}
@@ -196,6 +198,7 @@ class EEX_Data:
         :param use_mapping: True to change original column names to eex site mappings. Defaults to False (keep original)
         :return: a pandas DataFrame with all the valid expirations for the given symbol
         """
+        self.logger.info(f"Downloading data of {symbol} as_of {date}")
         expiration_date = expiration_date or (date - pd.offsets.Day(1))
         params = {
             'optionroot': f'"{symbol}"',
@@ -247,7 +250,7 @@ class EEX_Data:
 
 
 if __name__ == '__main__':
-    eex = EEX_Data()
+    eex = EEXData()
 
     config = eex.market_config_df
     milk = config[config['market'].str.contains("Liquid Milk")]

@@ -1,23 +1,17 @@
 from typing import Union
 
+import pandas as pd
 from pandas import DataFrame, Series
 
-from commodity_data.downloaders.base_downloader import BaseDownloader, df_index_columns, TypeColumn, product_to_date, \
-    combine_config
-import urllib.parse
-import io
-import pandas as pd
-import numpy as np
-from commodity_data.downloaders.default_config import barchart_cfg
-from ong_utils import get_cookies
+from commodity_data.downloaders.barchart.barchart_data import BarchartData
+from commodity_data.downloaders.base_downloader import BaseDownloader, df_index_columns, TypeColumn
+from commodity_data.downloaders.offsets import pd_date_offset
 from commodity_data.series_config import BarchartConfig
-from commodity_data import config
-import marshmallow_dataclass
 
 
 class BarchartDownloader(BaseDownloader):
 
-    def __init__(self, name: str = "Barchart"):
+    def __init__(self):
         """
         Creates a barchart downloader.
         For the list of symbols to read, uses a default configuration defined in
@@ -26,22 +20,10 @@ class BarchartDownloader(BaseDownloader):
         series_config can be used
         - barchart_downloader_replace: True/False value to define whether the configuration must extend the default
         (False, default value) or replace (if True) the available configuration
-        :param name: The name of the sensor where data will be stored/read from (Barchart as a default)
         """
-        cfg = config("barchart_downloader", dict())
-        barchart_parser = marshmallow_dataclass.class_schema(BarchartConfig)()
-        self.config = combine_config(barchart_cfg, cfg, barchart_parser,
-                                     use_default=config("barchart_downloader_use_default", True))
-        super().__init__(name=name)
-        symbol = self.config[-1].download_cfg.symbol  # Last symbol in config
-        url_base = f"https://www.barchart.com/futures/quotes/{symbol}/overview"
-        self.headers = {"Host": "www.barchart.com",
-                        "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:84.0) Gecko/20100101 Firefox/84.0"}
-        resp = self.http_get(url_base)
-        # Update cookies
-        self.cookies = get_cookies(resp)
-        self.headers.update({"x-XSRF-TOKEN".lower(): urllib.parse.unquote(self.cookies["XSRF-TOKEN"])})
-        pass
+        super().__init__(name="Barchart", config_name="barchart_downloader", class_schema=BarchartConfig,
+                         default_config_field="barchart_downloader_use_default")
+        self.data = BarchartData()
 
     def min_date(self):
         return pd.Timestamp(2013, 1, 1)
@@ -52,24 +34,10 @@ class BarchartDownloader(BaseDownloader):
             start_date = pd.Timestamp(start_date)
         start_date = start_date or self.min_date()
         cache = dict()
-        #for symbol, config in self.config.items():
         for cfg in self.config:
             symbol = cfg.download_cfg.symbol
-            params = dict(symbol=symbol,
-                          data="daily",
-                          maxrecords=np.busday_count(start_date.date(), pd.Timestamp.today().date()) + 1,
-                          volume="contract",
-                          order="asc",
-                          dividends="false",
-                          backadjust="false",
-                          daystoexpiration=1,
-                          contractroll="expiration"
-                          )
-            self.logger.info(f"Downloading {symbol} from {self.__class__.__name__} {self.name()}")
-            resp = self.http_get("https://www.barchart.com/proxies/timeseries/queryeod.ashx", params=params)
-            df_barchart = pd.read_csv(io.StringIO(resp.data.decode('utf-8')), header=None)
-            df_barchart.columns = ["symbol", "as_of", "open", "high", "low",
-                                   TypeColumn.close.value, "volume", "oi"][:len(df_barchart.columns)]
+            df_barchart = self.data.download(symbol, start_date=start_date, end_date=end_date)
+
             df_barchart.as_of = pd.to_datetime(df_barchart.as_of)
             df_barchart = df_barchart[df_barchart.as_of >= start_date]
             df = df_barchart.loc[:, ("open", "high", "low", TypeColumn.close.value, "as_of")]  # Store OHLC
@@ -84,7 +52,7 @@ class BarchartDownloader(BaseDownloader):
             expiry = cfg.download_cfg.expiry
             if expiry is not None:
                 maturity = pd.to_datetime(expiry)
-                df_melt['offset'] = product_to_date(maturity, product) - product_to_date(df_melt.as_of.dt, product)
+                df_melt['offset'] = pd_date_offset(df_melt.as_of.dt, maturity=maturity, period=product)
             else:
                 df_melt['offset'] = 0  # If no maturity, then it is supposed to be a stock or a spot value
             cache[symbol] = df_melt
@@ -104,11 +72,8 @@ class BarchartDownloader(BaseDownloader):
             return None
 
 
-
-
-
 if __name__ == '__main__':
-    ice = BarchartDownloader(barchart_cfg)
+    ice = BarchartDownloader()
     ice.download()
     ice.settle_xs(offset=1).plot()
     import matplotlib.pyplot as plt

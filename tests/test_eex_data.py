@@ -5,25 +5,26 @@ import unittest
 
 import pandas as pd
 
-from commodity_data.downloaders.eex.eex_data_manager import EEX_Data
+from commodity_data.downloaders.eex.eex_data import EEXData
+
 
 class EEX_Data_Test(unittest.TestCase):
-
     symbols = [
-        "/E.FEBY",      # Spanish baseload year futures
-        "/E.FEBQ",      # Spanish baseload quarter futures
-        "/E.FEBM",      # Spanish baseload month futures
-        "/E.FEB_WEEK",      # Spanish baseload week futures
+        "/E.FEBY",  # Spanish baseload year futures
+        "/E.FEBQ",  # Spanish baseload quarter futures
+        "/E.FEBM",  # Spanish baseload month futures
+        "/E.FEB_WEEK",  # Spanish baseload week futures
 
     ]
     min_date = "2023-12-01"
     # min_date = "2024-03-01"
     max_date = "2024-03-19"
+
     # min_date, max_date = "2023-12-15", "2024-01-10"
 
     @classmethod
     def setUpClass(cls):
-        cls.eex = EEX_Data()
+        cls.eex = EEXData()
         cls.dates = pd.bdate_range(cls.min_date, cls.max_date)
 
     def test_market_code(self):
@@ -33,7 +34,7 @@ class EEX_Data_Test(unittest.TestCase):
             ("EEX Austrian Power Futures", "Week", "peak"): "/E.ATP_WEEK",
             ("spanish", "Week", "base"): "/E.FEB_WEEK",
             ("spanish", "Week", None): "/E.FEB_WEEK",
-            ("spanish", None, None): "/E.FEBY",      # Will return first appearance: Year
+            ("spanish", None, None): "/E.FEBY",  # Will return first appearance: Year
         }
 
         for key, value in expected.items():
@@ -63,7 +64,8 @@ class EEX_Data_Test(unittest.TestCase):
                                         .set_index("as_of"))
                     displaydate = df_prices_tables['gv.displaydate'].iat[0]
                     expirationdate = df_prices_tables['gv.expirationdate'].iat[0]
-                    history = self.eex.download_price_symbol_history(price_symbol, since=self.dates[0], to=self.dates[-1])
+                    history = self.eex.download_price_symbol_history(price_symbol, since=self.dates[0],
+                                                                     to=self.dates[-1])
                     history = history.set_index(pd.to_datetime(history['tradedatetimegmt']).dt.normalize())
                     # Compare
                     compare_history = history['close'].dropna()
@@ -76,6 +78,3 @@ class EEX_Data_Test(unittest.TestCase):
                     comparison3 = compare_history.compare(compare_tables)
                     self.assertTrue(comparison.all(),
                                     f"Prices for {price_symbol} corresponding to  do not match")
-
-
-
