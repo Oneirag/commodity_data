@@ -213,17 +213,22 @@ class EEXData(HttpGet):
             params=params
         )
         df = pd.DataFrame.from_records(product_details['items'])
+        if df.empty:
+            return df
         # No need to use column mapping
         if use_mapping:
             mapping = self.market_config_df[self.market_config_df['code'] == symbol]['column_mapping'].iat[0]
             mapping = json.loads(mapping)
             df.rename(columns=mapping, inplace=True)
+        maturity_column = 'gv.eexdeliverystart'
+        # Remove invalid dates
+        df = df[~df[maturity_column].isna()]
+        df['maturity'] = pd.to_datetime(df[maturity_column].apply(lambda x: x.split(" ")[0]),
+                                        format=self.format_month_day_year)
         # Convert dates to pd.Timestamps
         for c in df.columns:
             if c.startswith("gv") and "date" in c:
                 df[c] = pd.to_datetime(df[c], format=self.format_month_day_year)
-            if c == 'gv.eexdeliverystart':
-                df['maturity'] = pd.to_datetime(df[c].apply(lambda x: x.split(" ")[0]), format=self.format_month_day_year)
         return df
 
     def get_eex_config_df(self, market: str, delivery=None, type_=None) -> pandas.DataFrame:

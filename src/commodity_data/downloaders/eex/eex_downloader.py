@@ -17,6 +17,8 @@ class EEXDownloader(BaseDownloader):
         for cfg in self.config:
             download_cfg = cfg.download_cfg
             table = self.eex.download_symbol_chain_table(symbol=download_cfg.instrument, date=as_of)
+            if table.empty:
+                continue
             table['market'] = self.name()
             table['commodity'] = cfg.commodity_cfg.commodity
             table['instrument'] = cfg.commodity_cfg.instrument
@@ -34,6 +36,8 @@ class EEXDownloader(BaseDownloader):
             table.drop(columns=list(set(table.columns) - set(list([*df_index_columns, 'close', 'maturity']))),
                        inplace=True)
             all_tables.append(table)
+        if not all_tables:
+            return pd.DataFrame()
         df_retval = pd.concat(all_tables)
         df_retval['as_of'] = as_of
         df_retval = self.pivot_table(df_retval, value_columns=['close', 'maturity'])

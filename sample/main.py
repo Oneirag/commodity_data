@@ -6,10 +6,12 @@ import matplotlib.pyplot as plt
 # import mpld3
 
 
-def recreate(downloader: BaseDownloader):
+def recreate(downloader: BaseDownloader) -> bool:
     """Deletes all data in database, asking for confirmation. If data is deleted, downloads data again"""
     if downloader.delete_all_data():
-        downloader.download("2024-01-01")
+        downloader.download()
+        return True
+    return False
 
 
 if __name__ == '__main__':
@@ -20,6 +22,7 @@ if __name__ == '__main__':
     recreate(omip)
     recreate(eex)
     recreate(barchart)
+
     print(omip.settlement_df)  # Actual data. No need to invoke download()
     print(omip.settle_xs(commodity="Power", product="Y", area="ES", offset=1))
     exit(0)
