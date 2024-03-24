@@ -41,7 +41,6 @@ class Omip_Data(HttpGet):
     logger = logger
     """Class to download data directly from omip website"""
 
-
     def download_omip_data(self, as_of: str, instrument="FTB", product="EL", zone="ES", **kwargs) -> (
             None | pd.DataFrame | pd.Series):
         """

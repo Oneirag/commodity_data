@@ -18,6 +18,11 @@ from commodity_data.series_config import df_index_columns, TypeColumn
 
 pd.options.mode.chained_assignment = 'raise'  # Raises SettingWithCopyWarning error instead of just warning
 
+
+class StoreDataException(Exception):
+    """Exception raised when dump failed"""
+    pass
+
 # To convert standard frequencies into products
 freqs = dict(Y="year",
              Q="quarter",
@@ -103,7 +108,8 @@ class BaseDownloader(HttpGet):
     period = "1D"
     database = "commodity_data"
 
-    def __init__(self, name: str, config_name: str, class_schema, default_config_field: str):
+    def __init__(self, name: str, config_name: str, class_schema, default_config_field: str,
+                 roll_expirations: bool = True):
         """
         Initializes the Downloader, creating clients using configuration. It needs url, host, admin_token, write_token
         and read_token keys
@@ -111,8 +117,10 @@ class BaseDownloader(HttpGet):
         :param config_name: default config name in the config file
         :param class_schema: class used to parse the configuration
         :param default_config_field: name for default config field
+        :param roll_expirations: True (default) to calculate adj_close by adjusting expirations, False to ignore them
         """
         super().__init__()
+        self.__roll_expirations = roll_expirations
         self.__name = name
         self.date_format = "%Y-%m-%d"
         self.logger = logger
@@ -122,22 +130,23 @@ class BaseDownloader(HttpGet):
         else:
             self.otp = None
         self._db_client = None
-        self.db_client_admin()  # Forces creation of database, sensors...
         self.__settlement_df = None
         self.cache = None
-        self.last_data_ts = self.date_last_data_ts()
+        self.last_data_ts = None
         self.config = None
         self.create_config(config_name, class_schema, default_config_field)
         pass
 
-    def delete_all_data(self, do_not_ask: bool = False):
-        """Deletes the whole remote database. Ask for confirmation"""
+    def delete_all_data(self, do_not_ask: bool = False) -> bool:
+        """Deletes the whole remote database. Ask for confirmation. REturns True if deleted"""
         if do_not_ask or ("yes" == input(f"Type 'yes' if you are sure to delete all {self.name()} data: ")):
             if self.db_client_admin().delete_sensor(self.database, self.name()):
                 self.logger.info(f"Deleted all market data for '{self.name()}' from database '{self.database}'")
                 self.db_client_admin(force_reload=True)  # This recreates bd from scratch
+                return True
             else:
                 self.logger.warning(f"Could not delete market data '{self.name()}' from database '{self.database}'")
+                return False
 
     def create_config(self, config_field: str, class_schema, default_config_field: str):
         # cfg = config("omip_downloader", dict())
@@ -156,6 +165,7 @@ class BaseDownloader(HttpGet):
         """Returns proxy auth dict, including MFA Code"""
         if self.otp is None:
             return None
+        self.logger.info(f"Getting MFA code for {self.name()}")
         mfa_code = self.otp.now()
         proxy_auth_dict = dict(username=config("proxy_username"),
                                password=get_password("service_name_proxy", "proxy_username"),
@@ -182,7 +192,7 @@ class BaseDownloader(HttpGet):
                 try:
                     self._db_client = create_client()
                 except ong_tsdb.exceptions.ProxyNotAuthorizedException:
-                    self.logger.info("Could get proxy authorization, retrying")
+                    self.logger.info("Could not get proxy authorization, retrying")
                     # Try again
                     self._db_client = create_client()
             else:
@@ -197,6 +207,7 @@ class BaseDownloader(HttpGet):
                 if not self._db_client.get_metadata(self.database, self.name()):
                     self._db_client.set_level_names(self.database, self.name(), df_index_columns)
             self._db_client.config_reload()  # Forces config reload in case external changes found
+            self.last_data_ts = self.date_last_data_ts()
         return self._db_client
 
     @property
@@ -224,11 +235,29 @@ class BaseDownloader(HttpGet):
         """Returns the name of the origin"""
         return self.__name
 
-    def settle_xs(self, **filter_):
+    def settle_xs(self, allow_zero_prices: bool=True, **filter_):
         """Applies a xs to self.settlement_df with key as values and levels as keys of filter"""
+        maturity_value = None if "maturity" not in filter_ else pd.Timestamp(filter_.pop('maturity')).timestamp()
+        if all(col in filter_ for col in ("maturity", "offset")):
+            raise ValueError("Cannot filter by offset and maturity at the same time")
+        if maturity_value:
+            filter_df = self.settlement_df[
+                self.settlement_df.xs("maturity", level="type", axis=1) == maturity_value].dropna(axis=1, how="all")
+        else:
+            filter_df = self.settlement_df
         try:
-            return self.settlement_df.xs(key=tuple(filter_.values()), level=tuple(filter_.keys()), axis=1,
-                                         drop_level=False)
+            retval = filter_df.xs(key=tuple(filter_.values()), level=tuple(filter_.keys()), axis=1,
+                                  drop_level=False)
+            if maturity_value:
+                names = list(retval.columns.names)
+                names.remove("offset")
+                retval = retval.T.groupby(level=names).sum().T
+            else:
+                # Remove maturity if not explicitly asked for it
+                retval = retval.loc[:, retval.columns.get_level_values('type') != 'maturity']
+            if not allow_zero_prices:
+                retval[retval == 0] = None
+            return retval
         except KeyError as ke:
             # the key not found
             failed_key = ke.args[0]
@@ -244,6 +273,24 @@ class BaseDownloader(HttpGet):
             raise ValueError(f"Key {failed_key} not found in level '{failed_level}' "
                              f"with available values {values_failed_level}. "
                              f"Key was found in level {level_failed_key}") from None
+
+    def pivot_table(self, df: pd.DataFrame, value_columns: list) -> pd.DataFrame:
+        levels = df_index_columns[:-1]  # Ignores "type"
+        type_level = df_index_columns[-1]
+
+        not_found_columns = set(list(["as_of", *levels, *value_columns])) - set(df.columns)
+        if not_found_columns:
+            error_msg = f"Could not find {not_found_columns} in provided dataframe"
+            self.logger.error(error_msg)
+            raise ValueError(error_msg)
+        # Use pd.pivot_table to reshape the DataFrame
+        df_pivot = pd.pivot_table(df, index='as_of', columns=levels, values=value_columns)
+        # Fix level order and names
+        level_idx = list(range(len(df_index_columns)))
+        # Put type the last
+        level_idx = level_idx[1:] + level_idx[:1]
+        df_pivot.columns = df_pivot.columns.reorder_levels(level_idx).set_names(df_index_columns)
+        return df_pivot
 
     def download(self, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None,
                  force_download: bool = False) -> int:
@@ -279,7 +326,7 @@ class BaseDownloader(HttpGet):
                 else:
                     self.__settlement_df = new_data
                 self.dump(new_data)
-        if retval:
+        if retval and self.__roll_expirations:
             self.logger.info(f"Adjusting expirations for {self.__class__.__name__} {self.name()}")
             self.roll_expiration()
         return retval
@@ -288,11 +335,15 @@ class BaseDownloader(HttpGet):
         """Saves give df to database. If None, self.__settlement_df will be saved"""
         if df is None:
             df = self.__settlement_df.sort_index()
+        if df.empty:
+            return True
         # write to database
+        # Be careful with maturity: it cannot be saved as date and has to be converted to timestamp
         retval = self.db_client_write.write_df(self.database, self.name(), df)
         if not retval:
             self.logger.error("Could not dump data")
             self.logger.info("Try to update proxy password using set_proxy_user_password() of __init__")
+            raise StoreDataException("Could not dump data")
         return retval
 
     def load(self):
@@ -337,7 +388,7 @@ class BaseDownloader(HttpGet):
                 last_available_row,
                 np.argwhere(~group_close.iloc[last_available_row, :].isna().values).flatten()  # not null columns
             ].xs(TypeColumn.close.value, level='type').index.get_level_values('offset').max()
-            for offset in range(1, max_offset):
+            for offset in range(1, int(max_offset)):
                 df_prod_0 = group_close.loc[:,
                             column_idx(index, df_index_columns, offset=offset, type=TypeColumn.close.value)]
                 df_prod_1 = group_close.loc[:,
@@ -346,14 +397,15 @@ class BaseDownloader(HttpGet):
 
                 # df_prod_1 should not have nans, so fill them
                 roll_values = roll(df_prod_0.values, df_prod_1.ffill().values, expirations, roll_offset)
-
                 df_roll = pd.Series(roll_values, index=df_prod_0.index,
                                     name=column_idx(index, df_index_columns, offset=offset,
                                                     type=TypeColumn.adj_close.value))
                 df_rolls.append(df_roll)
 
         # Append all rollings at the same time to avoid performance warning due to heavy fragmentation
+        ns = self.settlement_df.columns.names
         self.__settlement_df = pd.concat([self.settlement_df, *df_rolls], axis=1)
+        self.settlement_df.columns.names = ns
         self.dump(self.__settlement_df)  # Full dump due to rolling adjustments
         return None
 

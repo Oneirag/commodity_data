@@ -40,9 +40,8 @@ class OmipDownloader(BaseDownloader):
                     df[c] = getattr(cfg.commodity_cfg, c)
             df['market'] = self.name()
             df['type'] = TypeColumn.close.value
-
-            df = df.drop(columns=['maturity'])
-            df = pd.pivot_table(df, values="close", index="as_of", columns=df_index_columns)
+            df['maturity'] = df['maturity'].apply(lambda x: x.timestamp())
+            df = self.pivot_table(df, value_columns=['close', 'maturity'])
             dfs.append(df)
         if dfs:
             return pd.concat(dfs, axis=1)

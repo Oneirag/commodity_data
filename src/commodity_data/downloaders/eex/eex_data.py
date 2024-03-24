@@ -222,6 +222,8 @@ class EEXData(HttpGet):
         for c in df.columns:
             if c.startswith("gv") and "date" in c:
                 df[c] = pd.to_datetime(df[c], format=self.format_month_day_year)
+            if c == 'gv.eexdeliverystart':
+                df['maturity'] = pd.to_datetime(df[c].apply(lambda x: x.split(" ")[0]), format=self.format_month_day_year)
         return df
 
     def get_eex_config_df(self, market: str, delivery=None, type_=None) -> pandas.DataFrame:
@@ -251,6 +253,9 @@ class EEXData(HttpGet):
 
 if __name__ == '__main__':
     eex = EEXData()
+
+    symbol = eex.get_eex_config_df("Spanish", delivery="Day")
+    daily_data = eex.download_symbol_chain_table(symbol=symbol['code'].values[0], date=pd.Timestamp(2024, 3, 18))
 
     config = eex.market_config_df
     milk = config[config['market'].str.contains("Liquid Milk")]

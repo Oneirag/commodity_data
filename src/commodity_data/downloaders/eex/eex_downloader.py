@@ -7,9 +7,9 @@ from commodity_data.series_config import EEXConfig, df_index_columns
 
 
 class EEXDownloader(BaseDownloader):
-    def __init__(self):
+    def __init__(self, roll_expirations: bool = True):
         super().__init__("EEX", config_name="eex_downloader", class_schema=EEXConfig,
-                         default_config_field="eex_downloader_use_default")
+                         default_config_field="eex_downloader_use_default", roll_expirations=roll_expirations)
         self.eex = EEXData()
 
     def _download_date(self, as_of: pd.Timestamp) -> pd.DataFrame:
@@ -22,18 +22,21 @@ class EEXDownloader(BaseDownloader):
             table['instrument'] = cfg.commodity_cfg.instrument
             table['area'] = cfg.commodity_cfg.area
             table['product'] = cfg.download_cfg.product
-            table['type'] = "close"
+            # table['type'] = "close"
 
-            table['offset'] = table['gv.displaydate'].apply(lambda maturity: date_offset(as_of, maturity,
+            table['offset'] = table['maturity'].apply(lambda maturity: date_offset(as_of, maturity,
                                                                                          cfg.download_cfg.product,
                                                                                          ))
-            table.set_index(df_index_columns, inplace=True)
-            table = table[['close']]
+            # Convert maturities to timestamps
+            table['maturity'] = table['maturity'].apply(lambda x: x.timestamp())
+            # table.drop(columns=['maturity'], inplace=True)
+            # table.set_index(df_index_columns, inplace=True)
+            table.drop(columns=list(set(table.columns) - set(list([*df_index_columns, 'close', 'maturity']))),
+                       inplace=True)
             all_tables.append(table)
         df_retval = pd.concat(all_tables)
-        df_retval = df_retval.T
         df_retval['as_of'] = as_of
-        df_retval.set_index("as_of", inplace=True)
+        df_retval = self.pivot_table(df_retval, value_columns=['close', 'maturity'])
         return df_retval
 
     def min_date(self):
@@ -42,6 +45,19 @@ class EEXDownloader(BaseDownloader):
 
 
 if __name__ == '__main__':
-    eex = EEXDownloader()
+
+    force_download = False
+    # force_download = True
+    eex = EEXDownloader(roll_expirations=False)
     eex.delete_all_data()
-    eex.download(start_date=pd.Timestamp(2024, 3, 18), force_download=True)
+    eex.download(start_date=pd.Timestamp(2023, 1, 1), force_download=force_download)
+    # eex.download(start_date=pd.Timestamp(2024, 3, 18), force_download=True)
+    # year_data = eex.settle_xs(commodity="Power", area="ES", product="Y", offset=1, type="close")
+    year_data = eex.settle_xs(commodity="Power", area="ES",     # product="Y",
+                              type="close",
+                              maturity="2025-1-1",
+                              allow_zero_prices=False)
+
+    import matplotlib.pyplot as plt
+    year_data.plot()
+    plt.show()

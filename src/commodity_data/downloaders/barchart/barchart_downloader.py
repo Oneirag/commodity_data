@@ -28,7 +28,7 @@ class BarchartDownloader(BaseDownloader):
     def min_date(self):
         return pd.Timestamp(2013, 1, 1)
 
-    def download(self, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None) -> int:
+    def download(self, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None, **kwargs) -> int:
         # refresh cache
         if start_date is not None:
             start_date = pd.Timestamp(start_date)
@@ -52,14 +52,16 @@ class BarchartDownloader(BaseDownloader):
             expiry = cfg.download_cfg.expiry
             if expiry is not None:
                 maturity = pd.to_datetime(expiry)
+                df_melt['maturity'] = maturity.timestamp()
                 df_melt['offset'] = pd_date_offset(df_melt.as_of.dt, maturity=maturity, period=product)
             else:
+                df_melt['maturity'] = df_melt.as_of.apply(lambda dt: dt.timestamp())
                 df_melt['offset'] = 0  # If no maturity, then it is supposed to be a stock or a spot value
             cache[symbol] = df_melt
 
         concat_df = pd.concat(cache.values(), axis=0)
-        cache_df = pd.pivot_table(concat_df, values="price", index="as_of",
-                                  columns=df_index_columns)
+        concat_df.rename(columns={"price": "close"}, inplace=True)
+        cache_df = self.pivot_table(concat_df, value_columns=['close', 'maturity'])
         self.cache = cache_df
 
         return super().download(start_date, end_date)
