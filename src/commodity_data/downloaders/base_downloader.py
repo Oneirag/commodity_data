@@ -23,6 +23,12 @@ class StoreDataException(Exception):
     """Exception raised when dump failed"""
     pass
 
+
+class FilterKeyNotFoundException(Exception):
+    """Exception raised when trying to filter data in settle_xs but data is not available for this downloader"""
+    pass
+
+
 # To convert standard frequencies into products
 freqs = dict(Y="year",
              Q="quarter",
@@ -235,7 +241,7 @@ class BaseDownloader(HttpGet):
         """Returns the name of the origin"""
         return self.__name
 
-    def settle_xs(self, allow_zero_prices: bool=True, **filter_):
+    def settle_xs(self, allow_zero_prices: bool = True, **filter_):
         """Applies a xs to self.settlement_df with key as values and levels as keys of filter"""
         maturity_value = None if "maturity" not in filter_ else pd.Timestamp(filter_.pop('maturity')).timestamp()
         if all(col in filter_ for col in ("maturity", "offset")):
@@ -270,9 +276,9 @@ class BaseDownloader(HttpGet):
             level_failed_key = list(v.name for v in
                                     (self.settlement_df.columns.unique(l) for l in self.settlement_df.columns.names)
                                     if failed_key in v)
-            raise ValueError(f"Key {failed_key} not found in level '{failed_level}' "
-                             f"with available values {values_failed_level}. "
-                             f"Key was found in level {level_failed_key}") from None
+            raise FilterKeyNotFoundException(f"Key {failed_key} not found in level '{failed_level}' "
+                                             f"with available values {values_failed_level}. "
+                                             f"Key was found in level {level_failed_key}") from None
 
     def pivot_table(self, df: pd.DataFrame, value_columns: list) -> pd.DataFrame:
         levels = df_index_columns[:-1]  # Ignores "type"
