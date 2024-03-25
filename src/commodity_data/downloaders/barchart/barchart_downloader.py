@@ -11,7 +11,7 @@ from commodity_data.series_config import BarchartConfig
 
 class BarchartDownloader(BaseDownloader):
 
-    def __init__(self):
+    def __init__(self, roll_expirations: bool = True):
         """
         Creates a barchart downloader.
         For the list of symbols to read, uses a default configuration defined in
@@ -22,7 +22,7 @@ class BarchartDownloader(BaseDownloader):
         (False, default value) or replace (if True) the available configuration
         """
         super().__init__(name="Barchart", config_name="barchart_downloader", class_schema=BarchartConfig,
-                         default_config_field="barchart_downloader_use_default")
+                         default_config_field="barchart_downloader_use_default", roll_expirations=roll_expirations)
         self.data = BarchartData()
 
     def min_date(self):

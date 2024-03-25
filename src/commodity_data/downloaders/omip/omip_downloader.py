@@ -7,7 +7,7 @@ from commodity_data.downloaders.omip.omip_data import Omip_Data
 
 class OmipDownloader(BaseDownloader):
 
-    def __init__(self):
+    def __init__(self, roll_expirations: bool = True):
         """
         Creates a barchart downloader.
         For the list of symbols to read, uses a default configuration defined in
@@ -18,7 +18,7 @@ class OmipDownloader(BaseDownloader):
         (False, default value) or replace (if True) the available configuration
         """
         super().__init__(name="Omip", config_name="omip_downloader", class_schema=OmipConfig,
-                         default_config_field="omip_downloader_use_default")
+                         default_config_field="omip_downloader_use_default", roll_expirations=roll_expirations)
         # Calculate the absolute minimum date for download
         self.__min_date = min(pd.Timestamp(cfg.download_cfg.start_t) for cfg in self.config)
         self.omip = Omip_Data()
