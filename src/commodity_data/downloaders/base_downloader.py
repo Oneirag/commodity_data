@@ -110,6 +110,56 @@ class HttpGet:
         return req
 
 
+class _OngTsdbClientManager:
+    __client = None
+    __otp = None
+    __write_token = config("write_token")
+    __admin_token = config("admin_token")
+    __server_url = config("url")
+    logger = logger
+
+    def __init__(self, name: str, ):
+        self.name = name
+
+    @classmethod
+    def proxy_auth_dict(cls, name: str) -> dict | None:
+        """Returns proxy auth dict, including MFA Code"""
+        if config("service_name_google_auth", None) is not None and cls.__otp is None:
+            cls.__otp = GoogleAuth(get_password("service_name_google_auth", "proxy_username"))
+        if cls.__otp is None:
+            return None
+        cls.logger.info(f"Getting MFA code for {name}")
+        mfa_code = cls.__otp.now()
+        proxy_auth_dict = dict(username=config("proxy_username"),
+                               password=get_password("service_name_proxy", "proxy_username"),
+                               mfa_code=mfa_code)
+        return proxy_auth_dict
+
+    @classmethod
+    def __create_admin_client(cls, name: str):
+        if cls.__client is None:
+            cls.__client = OngTsdbClient(cls.__server_url, cls.__admin_token, retry_connect=1,
+                                         retry_total=1, proxy_auth_body=cls.proxy_auth_dict(name))
+
+    @property
+    def admin_client(self) -> OngTsdbClient:
+        if self.__client is None:
+            try:
+                self.__create_admin_client(self.name)
+            except ong_tsdb.exceptions.ProxyNotAuthorizedException:
+                self.logger.info("Could not get proxy authorization, retrying")
+                # Try again
+                self.__create_admin_client(self.name)
+        self.__client.update_token(self.__admin_token)
+        return self.__client
+
+    @property
+    def write_client(self) -> OngTsdbClient:
+        client = self.admin_client
+        client.update_token(config("write_token"))
+        return client
+
+
 class BaseDownloader(HttpGet):
     period = "1D"
     database = "commodity_data"
@@ -130,35 +180,26 @@ class BaseDownloader(HttpGet):
         self.__name = name
         self.date_format = "%Y-%m-%d"
         self.logger = logger
-        # Configuration of ong_tsdb database
-        if config("service_name_google_auth", None) is not None:
-            self.otp = GoogleAuth(get_password("service_name_google_auth", "proxy_username"))
-        else:
-            self.otp = None
-        self._db_client = None
+        self.__client = None
+        self.first_use = False
         self.__settlement_df = None
         self.cache = None
         self.last_data_ts = None
         self.config = None
         self.create_config(config_name, class_schema, default_config_field)
-        pass
 
     def delete_all_data(self, do_not_ask: bool = False) -> bool:
-        """Deletes the whole remote database. Ask for confirmation. REturns True if deleted"""
+        """Deletes the whole remote database. Ask for confirmation. Returns True if deleted"""
         if do_not_ask or ("yes" == input(f"Type 'yes' if you are sure to delete all {self.name()} data: ")):
-            if self.db_client_admin().delete_sensor(self.database, self.name()):
+            if self.db_client_admin.delete_sensor(self.database, self.name()):
                 self.logger.info(f"Deleted all market data for '{self.name()}' from database '{self.database}'")
-                self.db_client_admin(force_reload=True)  # This recreates bd from scratch
+                self.verify_database()
                 return True
             else:
                 self.logger.warning(f"Could not delete market data '{self.name()}' from database '{self.database}'")
                 return False
 
     def create_config(self, config_field: str, class_schema, default_config_field: str):
-        # cfg = config("omip_downloader", dict())
-        # omip_parser = marshmallow_dataclass.class_schema(OmipConfig)()
-        # self.config = combine_config(omip_cfg, cfg, omip_parser,
-        #                              use_default=config("omip_downloader_use_default", True))
         if not self.name() in default_config:
             raise ValueError(f"Could not find {self.name()} in default configuration")
         base_config = default_config[self.name()]
@@ -167,54 +208,36 @@ class BaseDownloader(HttpGet):
         self.config = combine_config(base_config, cfg, parser,
                                      use_default=config(default_config_field, True))
 
-    def proxy_auth_dict(self) -> dict | None:
-        """Returns proxy auth dict, including MFA Code"""
-        if self.otp is None:
-            return None
-        self.logger.info(f"Getting MFA code for {self.name()}")
-        mfa_code = self.otp.now()
-        proxy_auth_dict = dict(username=config("proxy_username"),
-                               password=get_password("service_name_proxy", "proxy_username"),
-                               mfa_code=mfa_code)
-        return proxy_auth_dict
-
     @property
     def db_client_write(self) -> OngTsdbClient:
-        """Returns a client to write, by reusing and destroying admin client"""
-        if self._db_client is None:
-            self.db_client_admin().update_token(config("write_token"))
-        return self._db_client
+        if not self.__client:
+            admin = self.db_client_admin  # Forces initialization of db is client write is used before client admin
+        return self.__client.write_client
 
-    def db_client_admin(self, force_reload: bool = False) -> OngTsdbClient:
+    @property
+    def db_client_admin(self) -> OngTsdbClient:
         """Creates a new admin client. If it is the first time or force_reload=False, creates the client,
         the database and all the sensors"""
 
-        def create_client() -> OngTsdbClient:
-            return OngTsdbClient(config("url"), config("admin_token"), retry_connect=1,
-                                 retry_total=1, proxy_auth_body=self.proxy_auth_dict())
+        if self.__client is None:
+            self.__client = _OngTsdbClientManager(self.name())
+            self.verify_database()
+        return self.__client.admin_client
 
-        if self._db_client is None or force_reload:
-            if not self._db_client:
-                try:
-                    self._db_client = create_client()
-                except ong_tsdb.exceptions.ProxyNotAuthorizedException:
-                    self.logger.info("Could not get proxy authorization, retrying")
-                    # Try again
-                    self._db_client = create_client()
-            else:
-                self._db_client.update_token((config("admin_token")))
-            if not self._db_client.exist_db(self.database):
-                self._db_client.create_db(self.database)
-            if not self._db_client.exist_sensor(self.database, self.name()):
-                self._db_client.create_sensor(self.database, self.name(), self.period, [],
-                                              config("read_token"), config("write_token"),
-                                              level_names=df_index_columns)
-            else:
-                if not self._db_client.get_metadata(self.database, self.name()):
-                    self._db_client.set_level_names(self.database, self.name(), df_index_columns)
-            self._db_client.config_reload()  # Forces config reload in case external changes found
-            self.last_data_ts = self.date_last_data_ts()
-        return self._db_client
+    def verify_database(self):
+        """Verifies that the database exists, setting up it if no"""
+        admin_client = self.__client.admin_client
+        if not admin_client.exist_db(self.database):
+            admin_client.create_db(self.database)
+        if not admin_client.exist_sensor(self.database, self.name()):
+            admin_client.create_sensor(self.database, self.name(), self.period, [],
+                                       config("read_token"), config("write_token"),
+                                       level_names=df_index_columns)
+        else:
+            if not admin_client.get_metadata(self.database, self.name()):
+                admin_client.set_level_names(self.database, self.name(), df_index_columns)
+        admin_client.config_reload()  # Forces config reload in case external changes found
+        self.last_data_ts = self.date_last_data_ts()
 
     @property
     def settlement_df(self):

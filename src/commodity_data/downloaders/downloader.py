@@ -1,8 +1,8 @@
 import pandas as pd
 
+from commodity_data import logger
 from commodity_data.downloaders import EEXDownloader, OmipDownloader, BarchartDownloader
 from commodity_data.downloaders.base_downloader import BaseDownloader, FilterKeyNotFoundException
-from commodity_data import logger
 
 
 class CommodityDownloader:
@@ -12,22 +12,26 @@ class CommodityDownloader:
         self.__downloaders = {dl.name(): dl for dl in dls}
         self.logger = logger
 
-    def downloaders(self, market_filter: list = None) -> tuple[str, BaseDownloader]:
-        market_filter = market_filter or self.__downloaders.keys()
+    def downloaders(self, market: list = None) -> tuple[str, BaseDownloader]:
+        """Gets an iterator of name, downloaders. Optionally: filter by given markets"""
+        market_filter = market or self.__downloaders.keys()
         for market, downloader in self.__downloaders.items():
             if market in market_filter or market == market_filter:
                 yield market, downloader
 
-    def delete_data(self, ask_confirmation: bool=True):
+    def delete_data(self, ask_confirmation: bool = True):
+        """Deletes data for the given downloaders (defaults to all of them)"""
         for market, downloader in self.downloaders():
             downloader.delete_all_data(ask_confirmation)
 
-    def download(self, start_date: pd.Timestamp = None, end_date: pd.Timestamp=None, force_download: bool = False,
+    def download(self, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None, force_download: bool = False,
                  markets: list = None):
+        """Same as BaseDownloader.downloaders, but working with all downloaders"""
         for market, downloader in self.downloaders(markets):
             downloader.download(start_date, end_date, force_download=force_download)
 
     def settle_xs(self, allow_zero_prices: bool = True, **filter_) -> pd.DataFrame:
+        """Same as BaseDownloader.settle_xs, but working with all downloaders"""
         data = []
         for market, downloader in self.downloaders(filter_.pop("market", None)):
             try:
@@ -37,12 +41,24 @@ class CommodityDownloader:
                 # The given filters, ignore it
                 self.logger.debug(filter_exception)
                 pass
-        retval = pd.concat(data)
+        retval = pd.concat(data, axis=1)
         return retval
+
+    def load(self, market=None):
+        """Loads data from database to memory for the given markets (all by default)"""
+        for mkt, downloader in self.downloaders(market=market):
+            downloader.load()
 
 
 if __name__ == '__main__':
     downloader = CommodityDownloader()
+    # downloader.load()
+    # exit(0)
+
     # This should return both Omip and EEX data
-    df = downloader.settle_xs(commodity="Power", area="ES", product="Y", offset=1)
+    df = downloader.settle_xs(commodity="Power", area="ES", product="Y", offset=1, type="close")
+    df.plot()
+    from matplotlib import pyplot as plt
+
+    plt.show()
     print(df)
