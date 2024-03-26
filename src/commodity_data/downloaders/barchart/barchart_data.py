@@ -53,7 +53,7 @@ class BarchartData(HttpGet):
                       daystoexpiration=1,
                       contractroll="expiration"
                       )
-        self.logger.info(f"Downloading {symbol} from Barchart")
+        self.logger.info(f"Downloading Barchart data for {symbol}")
         resp = self.http_get("https://www.barchart.com/proxies/timeseries/queryeod.ashx", params=params)
         df_barchart = pd.read_csv(io.StringIO(resp.data.decode('utf-8')), header=None)
         df_barchart.columns = ["symbol", "as_of", "open", "high", "low",

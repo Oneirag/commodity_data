@@ -31,7 +31,7 @@ class OmipDownloader(BaseDownloader):
         # for cdty, cdty_config in OmipConfig.commodity_config.items():
         for cfg in self.config:
             cdty = cfg.commodity_cfg.commodity
-            self.logger.info(f"Downloading {cdty} for date {self.as_of_str(as_of)}")
+            self.logger.info(f"Downloading Omip data for {cdty} for date {self.as_of_str(as_of)}")
             df = self.omip.download_omip_data(self.as_of_str(as_of), **cfg.download_cfg.__dict__)
             if df is None or df.empty:
                 continue        # Skip if empty or None

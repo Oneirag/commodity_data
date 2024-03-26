@@ -38,7 +38,7 @@ class EEX_Data_Test(unittest.TestCase):
         }
 
         for key, value in expected.items():
-            retval = self.eex.get_eex_code(*key)[0]
+            retval = self.eex.get_eex_symbol(*key)[0]
             self.assertEqual(retval, value)
 
     def test_table_vs_history(self):
@@ -78,3 +78,14 @@ class EEX_Data_Test(unittest.TestCase):
                     comparison3 = compare_history.compare(compare_tables)
                     self.assertTrue(comparison.all(),
                                     f"Prices for {price_symbol} corresponding to  do not match")
+
+    def test_price_symbol(self):
+        """Test that price symbols downloaded from the market and inferred are the same"""
+
+        reference_date = pd.Timestamp("2024-03-18")
+        for symbol, maturity in [("/E.FEBY", pd.Timestamp("2025-01-01")),
+                                 ("/E.FEBQ", pd.Timestamp("2024-10-01")),
+                                 ("/E.FEBM", pd.Timestamp("2024-06-01"))]:
+            downloaded = self.eex.get_eex_price_symbol(symbol, maturity, reference_date)
+            inferred = self.eex.get_eex_price_symbol(symbol, maturity, reference_date, no_download=True)
+            self.assertEqual(downloaded, inferred)

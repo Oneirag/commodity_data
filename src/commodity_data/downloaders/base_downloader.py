@@ -238,6 +238,7 @@ class BaseDownloader(HttpGet):
                 admin_client.set_level_names(self.database, self.name(), df_index_columns)
         admin_client.config_reload()  # Forces config reload in case external changes found
         self.last_data_ts = self.date_last_data_ts()
+        self.logger.info(f"Data for {self.name()} available up to {self.last_data_ts}")
 
     @property
     def settlement_df(self):

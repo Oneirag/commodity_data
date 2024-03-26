@@ -49,9 +49,18 @@ class CommodityDownloader:
         for mkt, downloader in self.downloaders(market=market):
             downloader.load()
 
+    def last_ts(self, market: str | list = None):
+        retval = dict()
+        for mkt, downloader in self.downloaders(market=market):
+            retval[mkt] = downloader.date_last_data_ts()
+        return retval
+
 
 if __name__ == '__main__':
-    downloader = CommodityDownloader()
+    downloader = CommodityDownloader(roll_expirations=False)
+    print(downloader.last_ts())
+    exit(0)
+    downloader.download()
     # downloader.load()
     # exit(0)
 

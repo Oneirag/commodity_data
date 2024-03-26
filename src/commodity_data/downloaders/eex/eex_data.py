@@ -10,7 +10,7 @@ import pandas
 import pandas as pd
 from bs4 import BeautifulSoup
 
-from commodity_data import logger
+from commodity_data import logger, to_delivery_month
 from commodity_data.downloaders.base_downloader import HttpGet
 
 
@@ -30,13 +30,14 @@ class EEXData(HttpGet):
     format_year_month_day = "%Y/%m/%d"        # Date format of other date: year/month/day
     format_month_day_year = "%m/%d/%Y"        # Date format for global vision dates, moth/day/year
     commodities = "power", "natural-gas", "environmentals", "agriculturals", "freight"
-    config_cache_file = Path(__file__).parent / "eex_market_config.csv"
+    config_cache_file = Path.home() / ".cache" / "ongpi" / "eex_market_config.csv"
 
     def __init__(self, force_download_config: bool=False):
         """
         Init the EEX Data class, reloading product configuration data from cache if possible
         :param force_download_config: ignore product configuration cache and force data reloading
         """
+        self.config_cache_file.parent.mkdir(parents=True, exist_ok=True)    # Create directories for config cache file
         super().__init__()
         self.logger = logger
         cache = self.load_check_cache() if not force_download_config else dict()
@@ -85,10 +86,11 @@ class EEXData(HttpGet):
         :return: a pandas DataFrame
         """
         if self.cache_valid:
-            self.logger.info("Reading EEX config market data from cache")
+            self.logger.info(f"Reading EEX config market data from {self.config_cache_file.absolute().as_posix()}")
             return self.cache_df
         elif self.cache_df is None:
-            self.logger.info("Reading EEX config market data from web site for the first time. This will take time")
+            self.logger.info("Reading EEX config market data from web site for the first time. "
+                             "This will around 35 seconds")
         else:
             self.logger.info("Refreshing EEX config market data from web site")
 
@@ -154,13 +156,13 @@ class EEXData(HttpGet):
         min_date = market_details[0]['result'][0]['dateCreated'][:10]
         return pd.Timestamp(min_date)
 
-    def download_price_symbol_history(self, price_symbol: str, since: pd.Timestamp | str = None,
+    def download_price_symbol_history(self, price_symbol: str, since: pd.Timestamp | str = "all",
                                       to: pd.Timestamp = None) -> pd.DataFrame:
         """
         Downloads price_symbol history from the first date it was created till no
         :param price_symbol: a price symbol with date delivery specification such as ("/E.FALMK24")
-        :param since: minium start date to download. Defaults to 45 business days prior to date. You can use
-        a date or "all" to get data since product was created in EEX
+        :param since: minium start date to download. Defaults to all. Use None to 45 business days prior to date (web
+        standard). You can use a date or "all" to get data since product was created in EEX
         :param to: max date for the data, defaults to today
         :return:
         """
@@ -188,18 +190,22 @@ class EEXData(HttpGet):
         df_history = pd.DataFrame.from_records(history['items'])
         return df_history
 
-    def download_symbol_chain_table(self, symbol: str, date: pd.Timestamp, expiration_date: pd.Timestamp = None,
+    def download_symbol_chain_table(self, symbol: str| List[str], date: pd.Timestamp | str,
+                                    expiration_date: pd.Timestamp | str = None,
                                     use_mapping: bool = False) -> pd.DataFrame:
         """
         Downloads the symbol table (with the chain for all strips for a certain delivery defined by the symbol)
-        :param symbol: eex simple code (e.g /E.EBEY)
+        :param symbol: eex simple code (e.g /E.EBEY). If a list, just downloads the first element
         :param date: settlement date for the symbol
         :param expiration_date: optional, defaults to date. Probably it won't be never needed
         :param use_mapping: True to change original column names to eex site mappings. Defaults to False (keep original)
         :return: a pandas DataFrame with all the valid expirations for the given symbol
         """
-        self.logger.info(f"Downloading data of {symbol} as_of {date}")
-        expiration_date = expiration_date or (date - pd.offsets.Day(1))
+        if isinstance(symbol, list):
+            symbol = symbol[0]
+        self.logger.info(f"Downloading EEX data of {symbol} as_of {date}")
+        date = pd.Timestamp(date)
+        expiration_date = pd.Timestamp(expiration_date or (date - pd.offsets.Day(1)))
         params = {
             'optionroot': f'"{symbol}"',
             'expirationdate': expiration_date.strftime(self.format_year_month_day),
@@ -231,7 +237,7 @@ class EEXData(HttpGet):
                 df[c] = pd.to_datetime(df[c], format=self.format_month_day_year)
         return df
 
-    def get_eex_config_df(self, market: str, delivery=None, type_=None) -> pandas.DataFrame:
+    def get_eex_config_df(self, market: str = None, delivery=None, type_=None) -> pandas.DataFrame:
         """Gets a filtered DataFrame with market, delivery, type and code columns
          of the EEX market symbol according to the given description (will return markets with that
          contain the given market, case-insensitive)
@@ -245,15 +251,55 @@ class EEXData(HttpGet):
         df = self.market_config_df
         for column, filter_ in ("market", market), ("delivery", delivery), ("type", type_):
             df = filter_df(df, column, filter_)
-        retval = df[['market', 'delivery', 'code']]
+        retval = df[['market', 'delivery', 'code', "type"]]
         return retval
 
-    def get_eex_code(self, market: str, delivery=None, type_=None) -> List[str]:
-        """Gets a list of the EEX market symbol according to the given description (will return markets with that
+    def get_eex_symbol(self, market: str, delivery=None, type_=None) -> List[str]:
+        """Gets a list of the EEX market symbols according to the given description (will return markets with that
          contain the given market, case insensitive)
          regular expression) and optionally delivery and type (base/peak)"""
         df = self.get_eex_config_df(market, delivery, type_)
         return df['code'].to_list()
+
+    def __get_eex_price_symbol_downloading(self, symbol: str, maturity: pd.Timestamp,
+                                           reference_date: pd.Timestamp = None):
+        # First, download yesterday's data
+        reference_date = reference_date or pd.Timestamp.today() - pd.offsets.BDay(1)
+        df = self.download_symbol_chain_table(symbol, date=reference_date)
+        # Try to find using maturity. If does not work, use gv.displaydate
+        filtered = df[df['maturity'] == maturity]
+        if filtered.empty:
+            filtered = df[df['gv.displaydate'] == maturity]
+        if filtered.empty:
+            return
+        return filtered['gv.pricesymbol'].iat[0]
+
+    def __get_eex_price_symbol_infer(self, symbol: str, maturity: pd.Timestamp) -> str | None:
+        symbol_data = self.cache_df[self.cache_df['code'] == symbol]
+        if symbol_data.empty:
+            return
+        delivery = symbol_data['delivery'].iat[0]
+        if delivery in ("Year", "Quarter", "Month", "Monat"):
+            return symbol + to_delivery_month(maturity)
+        else:
+            return
+
+    def get_eex_price_symbol(self, symbol: str, maturity: pd.Timestamp, reference_date: pd.Timestamp = None,
+                             no_download: bool = False) -> str:
+        """
+        Tries to the price symbol for a specific date, that can be used to download history
+        :param symbol: the eex market code
+        :param maturity: delivery start of the product
+        :param reference_date: a date for downloading, defaults to yesterday
+        :param no_download: False (default) to download data table for reference date and parse it. False to
+        create it from symbol and a standard delivery (works just with Years, Months and Quarters)
+        :return: the price symbol or None if it was not found
+        """
+        if not no_download:
+            symbol = self.__get_eex_price_symbol_downloading(symbol, maturity, reference_date)
+        else:
+            symbol = self.__get_eex_price_symbol_infer(symbol, maturity)
+        return symbol
 
 
 if __name__ == '__main__':

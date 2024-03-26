@@ -37,6 +37,9 @@ Downloads the following info:
 
 
 ## Usage
+### Standalone
+You can download prices directly from the sources to pandas dataframes, see examples in the samples folder
+
 ### Prerequisites
 #### Run underlying `ong_tsdb` database
 This library relies on an [ong_tsdb](https://github.com/Oneirag/ong_tsdb.git) database that must be running and 
