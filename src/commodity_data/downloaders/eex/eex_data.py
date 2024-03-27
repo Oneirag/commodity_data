@@ -204,7 +204,7 @@ class EEXData(HttpGet):
         """
         if isinstance(symbol, list):
             symbol = symbol[0]
-        self.logger.info(f"Downloading EEX data of {symbol} as_of {date}")
+        self.logger.info(f"Downloading EEX data as_of {pd.Timestamp(date).isoformat()[:10]} for {symbol}")
         date = pd.Timestamp(date)
         expiration_date = pd.Timestamp(expiration_date or (date - pd.offsets.Day(1)))
         params = {
@@ -224,6 +224,10 @@ class EEXData(HttpGet):
             return df
         # Remove rows with nan close values to avoid loading wrong data.
         df = df[~df['close'].isna()]
+        # If there is a step of more than 3 consecutive nan prices, remove all the rest
+        bad_idx = min(df.index[df.index.diff() > 3])
+        if bad_idx:
+            df = df.loc[:bad_idx - 1]
         if use_mapping:
             mapping = self.market_config_df[self.market_config_df['code'] == symbol]['column_mapping'].iat[0]
             mapping = json.loads(mapping)
@@ -307,15 +311,16 @@ class EEXData(HttpGet):
 
 if __name__ == '__main__':
     eex = EEXData()
-
     symbol = eex.get_eex_config_df("Spanish", delivery="Day")
     # daily_data = eex.download_symbol_chain_table(symbol=symbol['code'].values[0], date=pd.Timestamp(2024, 3, 18))
-    for wrong_date in [
-        "2020-11-11",
+    for symbol, wrong_date in [
+        ("/E.FE_DAILY", "2020-11-11",),
+        ("/E.FEBQ", "2020-10-09",),
         # "2018-10-23", "2018-06-03", "2019-06-05", "2019-06-05", "2019-06-05", "2019-08-07", "2019-08-21", "2019-12-19",
         # "2020-01-31"
     ]:
-        daily_data = eex.download_symbol_chain_table(symbol=symbol['code'].values[0], date=wrong_date)
+        # daily_data = eex.download_symbol_chain_table(symbol=symbol['code'].values[0], date=wrong_date)
+        daily_data = eex.download_symbol_chain_table(symbol=symbol, date=wrong_date)
         print(daily_data.to_string())
     exit(0)
     config = eex.market_config_df

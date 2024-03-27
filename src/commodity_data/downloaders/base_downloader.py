@@ -468,7 +468,7 @@ class BaseDownloader(HttpGet):
     def _download_date(self, as_of: pd.Timestamp) -> pd.DataFrame:
         pass
 
-    def as_of_str(self, as_of):
+    def as_of_str(self, as_of) -> str:
         """Formats a date to str using self.date_format"""
         if isinstance(as_of, str):
             return as_of

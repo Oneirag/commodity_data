@@ -22,6 +22,7 @@ class EEXDownloader(BaseDownloader):
         :return:
         """
         max_offset = 4
+        df = df[df['offsets'] < 20]  # Remove directly very large offsets
         offsets = df['offset']
         offset_steps = offsets.diff()
         bad_offset_steps = (offset_steps > max_offset) & (offsets > 1)

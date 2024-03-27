@@ -1,8 +1,8 @@
 import pandas as pd
 
 from commodity_data.downloaders.base_downloader import BaseDownloader, TypeColumn
-from commodity_data.series_config import df_index_columns, OmipConfig
 from commodity_data.downloaders.omip.omip_data import Omip_Data
+from commodity_data.series_config import df_index_columns, OmipConfig
 
 
 class OmipDownloader(BaseDownloader):
@@ -31,7 +31,7 @@ class OmipDownloader(BaseDownloader):
         # for cdty, cdty_config in OmipConfig.commodity_config.items():
         for cfg in self.config:
             cdty = cfg.commodity_cfg.commodity
-            self.logger.info(f"Downloading Omip data for {cdty} for date {self.as_of_str(as_of)}")
+            self.logger.info(f"Downloading Omip as of {self.as_of_str(as_of)} for {cdty}")
             df = self.omip.download_omip_data(self.as_of_str(as_of), **cfg.download_cfg.__dict__)
             if df is None or df.empty:
                 continue        # Skip if empty or None
