@@ -225,9 +225,9 @@ class EEXData(HttpGet):
         # Remove rows with nan close values to avoid loading wrong data.
         df = df[~df['close'].isna()]
         # If there is a step of more than 3 consecutive nan prices, remove all the rest
-        bad_idx = min(df.index[df.index.diff() > 3])
-        if bad_idx:
-            df = df.loc[:bad_idx - 1]
+        bad_idxs = df.index[df.index.diff() > 3]
+        if not bad_idxs.empty:
+            df = df.loc[:min(bad_idxs) - 1]
         if use_mapping:
             mapping = self.market_config_df[self.market_config_df['code'] == symbol]['column_mapping'].iat[0]
             mapping = json.loads(mapping)
