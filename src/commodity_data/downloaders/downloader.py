@@ -59,8 +59,9 @@ class CommodityDownloader:
 if __name__ == '__main__':
     downloader = CommodityDownloader(roll_expirations=False)
     print(downloader.last_ts())
-    exit(0)
     downloader.download()
+    exit(0)
+
     # downloader.load()
     # exit(0)
 

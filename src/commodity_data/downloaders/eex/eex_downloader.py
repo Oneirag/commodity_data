@@ -1,3 +1,5 @@
+from datetime import date
+
 import pandas as pd
 
 from commodity_data.downloaders.base_downloader import BaseDownloader
@@ -47,6 +49,15 @@ class EEXDownloader(BaseDownloader):
         min_date = min(self.eex.get_min_date(cfg.download_cfg.instrument) for cfg in self.config)
         return min_date
 
+    def get_holidays(self, start_date: pd.Timestamp, end_date: pd.Timestamp) -> dict:
+        """Add custom holidays for EEX: dec24th and dec31st"""
+        parent_holidays = super().get_holidays(start_date, end_date)
+        # Append dec31st and dec24th
+        for year in range(start_date.year, end_date.year + 1):
+            parent_holidays[date(year, 12, 24)] = "Christmas Day"
+            parent_holidays[date(year, 12, 31)] = "Christmas Eve"
+
+        return parent_holidays
 
 if __name__ == '__main__':
 

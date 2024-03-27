@@ -322,6 +322,21 @@ class BaseDownloader(HttpGet):
         df_pivot.columns = df_pivot.columns.reorder_levels(level_idx).set_names(df_index_columns)
         return df_pivot
 
+    def get_holidays(self, start_date: pd.Timestamp, end_date: pd.Timestamp) -> dict:
+        """As a default, return the holidays of the ECB, which are target holidays"""
+        return holidays.EuropeanCentralBank(years=range(start_date.year, end_date.year + 1))
+
+    def prepare_cache(self, start_date: pd.Timestamp, end_date: pd.Timestamp, force_download: bool):
+        """
+        This function will be called before daily processing of data to prepare a cache of data.
+        Ignore it if no cache will be used, define in child classes to use cache
+        :param start_date:  start date for downloading data
+        :param end_date: end date for downloading data
+        :param force_download: True to force download
+        :return: None
+        """
+        pass
+
     def download(self, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None,
                  force_download: bool = False) -> int:
         """
@@ -334,7 +349,11 @@ class BaseDownloader(HttpGet):
         retval = 0
         start_date = pd.Timestamp(start_date or self.min_date())
         end_date = pd.Timestamp(end_date or pd.Timestamp.today().normalize())
-        ecb_hols = holidays.EuropeanCentralBank(years=range(start_date.year, end_date.year + 1))
+        # If there is data already stored, unless force_download avoid downloading data older than 10 years
+        if self.last_data_ts and not force_download:
+            start_date = max(start_date, self.last_data_ts - pd.offsets.YearBegin(10))
+        self.prepare_cache(start_date, end_date, force_download)
+        ecb_hols = self.get_holidays(start_date, end_date)
         as_of_dates = pd.bdate_range(start_date, end_date, holidays=ecb_hols, freq="C")
         # Chunked in months (20 Business days aprox)
         for as_of_chunk in np.array_split(as_of_dates, 20):
@@ -404,7 +423,8 @@ class BaseDownloader(HttpGet):
         # Force ordering
         self.__settlement_df = self.__settlement_df.sort_index()
         df_rolls = list()
-        for _, group in self.settlement_df.groupby(["market", "commodity", "area", "product"], axis=1):
+        # for _, group in self.settlement_df.groupby(["market", "commodity", "area", "product"], axis=1):
+        for _, group in self.settlement_df.T.groupby(["market", "commodity", "area", "product"]):
             # Just type=close in the group (ignoring any other type)
             group_close = group.xs(TypeColumn.close.value, level="type", axis=1, drop_level=False)
             if group_close.empty:

@@ -6,7 +6,8 @@ default_config = {
         {
             "download_cfg": {
                 "instrument": "FTB", "product": "EL", "zone": "ES",
-                "start_t": "2006-01-01",
+                # "start_t": "2006-01-01",
+                "start_t": "2006-07-03",  # There is no data availabe before that date
             },
             "commodity_cfg": {
                 "commodity": "Power", "instrument": "BL", "area": "ES",
