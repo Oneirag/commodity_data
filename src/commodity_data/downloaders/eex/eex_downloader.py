@@ -14,6 +14,23 @@ class EEXDownloader(BaseDownloader):
                          default_config_field="eex_downloader_use_default", roll_expirations=roll_expirations)
         self.eex = EEXData()
 
+    def remove_outliers(self, df: pd.DataFrame, symbol: str, date: pd.Timestamp) -> pd.DataFrame:
+        """
+        Product offset typically should be continuous from 1 onwards, stepping from 1 to 1
+        However, it can appear a product with strange offsets, that has to be removed
+        :param df:
+        :return:
+        """
+        max_offset = 4
+        offsets = df['offset']
+        offset_steps = offsets.diff()
+        bad_offset_steps = (offset_steps > max_offset) & (offsets > 1)
+        if bad_offset_steps.any():
+            self.logger.warning(f"Suspicious offset found for {symbol} as of {date}")
+            bad_idx = bad_offset_steps.index[bad_offset_steps].min()
+            return df[:bad_idx]
+        return df
+
     def _download_date(self, as_of: pd.Timestamp) -> pd.DataFrame:
         all_tables = list()
         for cfg in self.config:
@@ -31,10 +48,8 @@ class EEXDownloader(BaseDownloader):
             table['offset'] = table['maturity'].apply(lambda maturity: date_offset(as_of, maturity,
                                                                                    cfg.download_cfg.product,
                                                                                    ))
-
-            if not table[table['offset'] > 20].empty:
-                self.logger.warning(f"Found too big offsets for {download_cfg.instrument} as of {as_of}")
-
+            # Removes outliers
+            table = self.remove_outliers(table, symbol=download_cfg.instrument, date=as_of)
             # Convert maturities to timestamps
             table['maturity'] = table['maturity'].apply(lambda x: x.timestamp())
             # table.drop(columns=['maturity'], inplace=True)
@@ -68,6 +83,7 @@ if __name__ == '__main__':
     force_download = False
     # force_download = True
     eex = EEXDownloader(roll_expirations=False)
+
     eex.delete_all_data()
     eex.download()
     exit(0)

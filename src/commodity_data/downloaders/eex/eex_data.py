@@ -222,9 +222,8 @@ class EEXData(HttpGet):
         df = pd.DataFrame.from_records(product_details['items'])
         if df.empty:
             return df
-        # Remove rows with nan close values to avoid loading wrong data
+        # Remove rows with nan close values to avoid loading wrong data.
         df = df[~df['close'].isna()]
-        # No need to use column mapping
         if use_mapping:
             mapping = self.market_config_df[self.market_config_df['code'] == symbol]['column_mapping'].iat[0]
             mapping = json.loads(mapping)
@@ -312,8 +311,9 @@ if __name__ == '__main__':
     symbol = eex.get_eex_config_df("Spanish", delivery="Day")
     # daily_data = eex.download_symbol_chain_table(symbol=symbol['code'].values[0], date=pd.Timestamp(2024, 3, 18))
     for wrong_date in [
-        "2018-10-23", "2018-06-03", "2019-06-05", "2019-06-05", "2019-06-05", "2019-08-07", "2019-08-21", "2019-12-19",
-        "2020-01-31"
+        "2020-11-11",
+        # "2018-10-23", "2018-06-03", "2019-06-05", "2019-06-05", "2019-06-05", "2019-08-07", "2019-08-21", "2019-12-19",
+        # "2020-01-31"
     ]:
         daily_data = eex.download_symbol_chain_table(symbol=symbol['code'].values[0], date=wrong_date)
         print(daily_data.to_string())
