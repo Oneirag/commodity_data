@@ -351,7 +351,7 @@ class BaseDownloader(HttpGet):
         end_date = pd.Timestamp(end_date or pd.Timestamp.today().normalize())
         # If there is data already stored, unless force_download avoid downloading data older than 10 years
         if self.last_data_ts and not force_download:
-            start_date = max(start_date, self.last_data_ts - pd.offsets.YearBegin(10))
+            start_date = max(start_date, self.last_data_ts.tz_localize(start_date.tz) - pd.offsets.YearBegin(10))
         self.prepare_cache(start_date, end_date, force_download)
         ecb_hols = self.get_holidays(start_date, end_date)
         as_of_dates = pd.bdate_range(start_date, end_date, holidays=ecb_hols, freq="C")
@@ -418,13 +418,16 @@ class BaseDownloader(HttpGet):
             return idx
 
         # remove adj_close, ignoring non-existing columns
-        self.__settlement_df = self.__settlement_df.drop(TypeColumn.adj_close.value, level="type", axis=1,
+        settlement_df = self.settlement_df.drop(TypeColumn.adj_close.value, level="type", axis=1,
                                                          errors="ignore")
+        # remove maturity, ignoring non-existing columns
+        settlement_df = settlement_df.drop("maturity", level="type", axis=1, errors="ignore")
+
         # Force ordering
-        self.__settlement_df = self.__settlement_df.sort_index()
+        settlement_df = settlement_df.sort_index()
         df_rolls = list()
-        # for _, group in self.settlement_df.groupby(["market", "commodity", "area", "product"], axis=1):
-        for _, group in self.settlement_df.T.groupby(["market", "commodity", "area", "product"]):
+        for _, group in settlement_df.T.groupby(["market", "commodity", "area", "product"]):
+            group = group.T  # As groupby with axis is deprecated, it has to be manually transposed back
             # Just type=close in the group (ignoring any other type)
             group_close = group.xs(TypeColumn.close.value, level="type", axis=1, drop_level=False)
             if group_close.empty:
@@ -452,10 +455,12 @@ class BaseDownloader(HttpGet):
                                                     type=TypeColumn.adj_close.value))
                 df_rolls.append(df_roll)
 
+        # Update with the changes
+        self.__settlement_df = settlement_df
         # Append all rollings at the same time to avoid performance warning due to heavy fragmentation
-        ns = self.settlement_df.columns.names
+        ns = self.__settlement_df.columns.names
         self.__settlement_df = pd.concat([self.settlement_df, *df_rolls], axis=1)
-        self.settlement_df.columns.names = ns
+        self.__settlement_df.columns.names = ns
         self.dump(self.__settlement_df)  # Full dump due to rolling adjustments
         return None
 

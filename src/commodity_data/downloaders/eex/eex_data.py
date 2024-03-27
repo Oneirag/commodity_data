@@ -27,17 +27,17 @@ def get_js_var(var_name: str, where: str) -> str:
 class EEXData(HttpGet):
     """Class to get market data from eex"""
 
-    format_year_month_day = "%Y/%m/%d"        # Date format of other date: year/month/day
-    format_month_day_year = "%m/%d/%Y"        # Date format for global vision dates, moth/day/year
+    format_year_month_day = "%Y/%m/%d"  # Date format of other date: year/month/day
+    format_month_day_year = "%m/%d/%Y"  # Date format for global vision dates, moth/day/year
     commodities = "power", "natural-gas", "environmentals", "agriculturals", "freight"
     config_cache_file = Path.home() / ".cache" / "ongpi" / "eex_market_config.csv"
 
-    def __init__(self, force_download_config: bool=False):
+    def __init__(self, force_download_config: bool = False):
         """
         Init the EEX Data class, reloading product configuration data from cache if possible
         :param force_download_config: ignore product configuration cache and force data reloading
         """
-        self.config_cache_file.parent.mkdir(parents=True, exist_ok=True)    # Create directories for config cache file
+        self.config_cache_file.parent.mkdir(parents=True, exist_ok=True)  # Create directories for config cache file
         super().__init__()
         self.logger = logger
         cache = self.load_check_cache() if not force_download_config else dict()
@@ -134,6 +134,7 @@ class EEXData(HttpGet):
 
     def get_min_date(self, eex_code: str) -> pd.Timestamp:
         """Gets info for a given eex_code, such as /E.FAPPJ24 or "/E.FAPP. Gets min date(when symbol was created)"""
+
         # Try to get from cache first. Min date should not change regularly and it is quite slow
 
         def get_date_from_cache(code: str):
@@ -145,7 +146,7 @@ class EEXData(HttpGet):
         if self.cache_df is not None:
             if retval := get_date_from_cache(eex_code):
                 return retval
-            if retval := get_date_from_cache(eex_code[:6]):        # If has product delivery spec, remote it
+            if retval := get_date_from_cache(eex_code[:6]):  # If has product delivery spec, remote it
                 return retval
 
         params = {
@@ -190,7 +191,7 @@ class EEXData(HttpGet):
         df_history = pd.DataFrame.from_records(history['items'])
         return df_history
 
-    def download_symbol_chain_table(self, symbol: str| List[str], date: pd.Timestamp | str,
+    def download_symbol_chain_table(self, symbol: str | List[str], date: pd.Timestamp | str,
                                     expiration_date: pd.Timestamp | str = None,
                                     use_mapping: bool = False) -> pd.DataFrame:
         """
@@ -221,6 +222,8 @@ class EEXData(HttpGet):
         df = pd.DataFrame.from_records(product_details['items'])
         if df.empty:
             return df
+        # Remove rows with nan close values to avoid loading wrong data
+        df = df[~df['close'].isna()]
         # No need to use column mapping
         if use_mapping:
             mapping = self.market_config_df[self.market_config_df['code'] == symbol]['column_mapping'].iat[0]
@@ -242,6 +245,7 @@ class EEXData(HttpGet):
          of the EEX market symbol according to the given description (will return markets with that
          contain the given market, case-insensitive)
          regular expression) and optionally delivery and type (base/peak)"""
+
         def filter_df(df: pd.DataFrame, filter_column: str, filter_value: str) -> pd.DataFrame:
             if not filter_:
                 return df
@@ -306,8 +310,14 @@ if __name__ == '__main__':
     eex = EEXData()
 
     symbol = eex.get_eex_config_df("Spanish", delivery="Day")
-    daily_data = eex.download_symbol_chain_table(symbol=symbol['code'].values[0], date=pd.Timestamp(2024, 3, 18))
-
+    # daily_data = eex.download_symbol_chain_table(symbol=symbol['code'].values[0], date=pd.Timestamp(2024, 3, 18))
+    for wrong_date in [
+        "2018-10-23", "2018-06-03", "2019-06-05", "2019-06-05", "2019-06-05", "2019-08-07", "2019-08-21", "2019-12-19",
+        "2020-01-31"
+    ]:
+        daily_data = eex.download_symbol_chain_table(symbol=symbol['code'].values[0], date=wrong_date)
+        print(daily_data.to_string())
+    exit(0)
     config = eex.market_config_df
     milk = config[config['market'].str.contains("Liquid Milk")]
     milk = config[config['market'].str.contains("Spanish")]

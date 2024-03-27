@@ -29,8 +29,12 @@ class EEXDownloader(BaseDownloader):
             # table['type'] = "close"
 
             table['offset'] = table['maturity'].apply(lambda maturity: date_offset(as_of, maturity,
-                                                                                         cfg.download_cfg.product,
-                                                                                         ))
+                                                                                   cfg.download_cfg.product,
+                                                                                   ))
+
+            if not table[table['offset'] > 20].empty:
+                self.logger.warning(f"Found too big offsets for {download_cfg.instrument} as of {as_of}")
+
             # Convert maturities to timestamps
             table['maturity'] = table['maturity'].apply(lambda x: x.timestamp())
             # table.drop(columns=['maturity'], inplace=True)
@@ -59,20 +63,23 @@ class EEXDownloader(BaseDownloader):
 
         return parent_holidays
 
-if __name__ == '__main__':
 
+if __name__ == '__main__':
     force_download = False
     # force_download = True
     eex = EEXDownloader(roll_expirations=False)
     eex.delete_all_data()
+    eex.download()
+    exit(0)
     eex.download(start_date=pd.Timestamp(2023, 1, 1), force_download=force_download)
     # eex.download(start_date=pd.Timestamp(2024, 3, 18), force_download=True)
     # year_data = eex.settle_xs(commodity="Power", area="ES", product="Y", offset=1, type="close")
-    year_data = eex.settle_xs(commodity="Power", area="ES",     # product="Y",
+    year_data = eex.settle_xs(commodity="Power", area="ES",  # product="Y",
                               type="close",
                               maturity="2025-1-1",
                               allow_zero_prices=False)
 
     import matplotlib.pyplot as plt
+
     year_data.plot()
     plt.show()
