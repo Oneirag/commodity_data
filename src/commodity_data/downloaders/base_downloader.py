@@ -265,9 +265,61 @@ class BaseDownloader(HttpGet):
         """Returns the name of the origin"""
         return self.__name
 
+    def maturity2timestamp(self, df: pd.DataFrame = None) -> pd.DataFrame:
+        """Converts maturity values to timestamp"""
+        return self.__maturity_to("timestamp", df)
+
+    def maturity2datetime(self, df: pd.DataFrame = None) -> pd.DataFrame:
+        """Converts maturity values to datatime objects"""
+        return self.__maturity_to("datetime", df)
+
+    def __maturity_to(self, what: str, df: pd.DataFrame = None) -> pd.DataFrame:
+        """Converts inplace maturity values to timestamp (what='timestamp') or to datetime (what='datetime')"""
+        is_settle = df is None
+        df = self.settlement_df if is_settle else df
+        if df.empty:
+            return df
+        index_maturity = df.columns.get_level_values('type') == 'maturity'
+        if not index_maturity.any():
+            return df
+        maturity = df.loc[:, index_maturity]
+        if maturity.empty:
+            return df
+
+        def transform(value: pd.Timestamp | float) -> pd.Timestamp | float | None:
+            if what == "datetime":
+                # return pd.Timestamp.fromtimestamp(value).normalize()
+                if not pd.isna(value) and value > 0:
+                    return pd.Timestamp.fromtimestamp(value).normalize()
+                return None
+            elif what == "timestamp":
+                if not pd.isna(value):  # and value > 0:
+                    return value.timestamp()
+                return None
+
+        # Perform the transformation of values, inplace
+        dtypes = {
+            "datetime": 'datetime64[ns]',
+            "timestamp": float
+        }
+        df_dtypes = df.dtypes
+        df = df.astype("object")  # To avoid problems with conversions
+        for col in df.columns[index_maturity]:
+            # df.loc[:, col].apply(lambda x: x*1e9).astype(dtypes[what]) # from ts to datetime
+            if df_dtypes[col] != dtypes[what]:
+                df.loc[:, col] = df.loc[:, col].apply(transform)
+                df_dtypes[col] = dtypes[what]
+            # df = df.assign(**{col: df.loc[:, col].apply(transform)}) #.astype(dtypes[what]))
+        # convert dtypes back
+        df = df.astype(df_dtypes)
+
+        if is_settle:
+            self.__settlement_df = df
+        return df
+
     def settle_xs(self, allow_zero_prices: bool = True, **filter_):
         """Applies a xs to self.settlement_df with key as values and levels as keys of filter"""
-        maturity_value = None if "maturity" not in filter_ else pd.Timestamp(filter_.pop('maturity')).timestamp()
+        maturity_value = None if "maturity" not in filter_ else pd.Timestamp(filter_.pop('maturity'))
         if all(col in filter_ for col in ("maturity", "offset")):
             raise ValueError("Cannot filter by offset and maturity at the same time")
         if maturity_value:
@@ -305,9 +357,11 @@ class BaseDownloader(HttpGet):
                                              f"Key was found in level {level_failed_key}") from None
 
     def pivot_table(self, df: pd.DataFrame, value_columns: list) -> pd.DataFrame:
+        """Pivots a DataFrame to create Multiindex columns. Makes sure that the provided DataFrame
+         has the required columns (those of df_index_columns plus "as_of" for the index plus the
+         ones in value_columns). The columns of value_columns will be the ones that form the
+         last level of the column multiindex, 'type'"""
         levels = df_index_columns[:-1]  # Ignores "type"
-        type_level = df_index_columns[-1]
-
         not_found_columns = set(list(["as_of", *levels, *value_columns])) - set(df.columns)
         if not_found_columns:
             error_msg = f"Could not find {not_found_columns} in provided dataframe"
@@ -383,11 +437,12 @@ class BaseDownloader(HttpGet):
     def dump(self, df: pd.DataFrame = None) -> bool:
         """Saves give df to database. If None, self.__settlement_df will be saved"""
         if df is None:
-            df = self.__settlement_df.sort_index()
+            df = self.__settlement_df
         if df.empty:
             return True
         # write to database
         # Be careful with maturity: it cannot be saved as date and has to be converted to timestamp
+        df = self.maturity2timestamp(df)
         retval = self.db_client_write.write_df(self.database, self.name(), df)
         if not retval:
             self.logger.error("Could not dump data")
@@ -404,6 +459,9 @@ class BaseDownloader(HttpGet):
             # Reads EVERYTHING in memory converted to float64!!!
             self.__settlement_df = self.db_client_write.read(self.database, self.name(), self.min_date()). \
                 astype(np.float64)
+            self.__settlement_df.sort_index(inplace=True)
+            self.__settlement_df.sort_index(inplace=True, axis=1)
+            self.maturity2datetime()
 
     def roll_expiration(self, roll_offset=0) -> None:
         """

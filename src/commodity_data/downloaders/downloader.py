@@ -69,11 +69,11 @@ class CommodityDownloader:
 
 
 if __name__ == '__main__':
-    downloader = CommodityDownloader(roll_expirations=False)
+    downloader = CommodityDownloader()
     print(downloader.get_last_ts())
-    # downloader.download_all_yesterday()
-    downloader.roll_expiration("EEX")
-    exit(0)
+    downloader.download_all_yesterday()
+    # downloader.roll_expiration(["EEX", "Omip"])
+    # exit(0)
 
     # downloader.load()
     # exit(0)
