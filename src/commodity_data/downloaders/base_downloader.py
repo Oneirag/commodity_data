@@ -54,7 +54,6 @@ class GoogleAuth(pyotp.TOTP):
 
 def product_to_date(obj, product: str):
     """Transforms product as string (Y/M/Q/D) into functions call to datetime objects"""
-
     return getattr(obj, freqs[product])
 
 
@@ -185,8 +184,34 @@ class BaseDownloader(HttpGet):
         self.__settlement_df = None
         self.cache = None
         self.last_data_ts = None
-        self.config = None
+        self.__download_config = None
         self.create_config(config_name, class_schema, default_config_field)
+        self.__download_config_filter = None
+        self.set_force_download_filter(None)  # Initialize, just in case
+
+    @property
+    def download_config(self):
+        return self.__download_config
+
+    def set_force_download_filter(self, config_filter: bool | dict | list | None):
+        """Sets the config filter used for forcing downloading of just a specific commodity"""
+        # If the filter is True, False or None reverts to the list all configs,
+        # So when calling to download method all configs will be updated
+        if any(config_filter is something for something in (True, False, None)):
+            self.__download_config_filter = [cfg.download_cfg for cfg in self.__download_config]
+            return
+        if isinstance(config_filter, dict):
+            config_filter = [config_filter]
+        try:
+            self.__download_config_filter = []
+            for cdty_cfg in self.__download_config:
+                for filter_cfg in config_filter:
+                    if cdty_cfg.download_cfg.meets(filter_cfg):
+                        self.__download_config_filter.append(cdty_cfg.download_cfg)
+                        break
+        except Exception as e:
+            self.logger.error(f"Force Download filter has invalid fields: {e}")
+            raise
 
     def delete_all_data(self, do_not_ask: bool = False) -> bool:
         """Deletes the whole remote database. Ask for confirmation. Returns True if deleted"""
@@ -205,8 +230,8 @@ class BaseDownloader(HttpGet):
         base_config = default_config[self.name()]
         cfg = config(config_field, dict())
         parser = marshmallow_dataclass.class_schema(class_schema)()
-        self.config = combine_config(base_config, cfg, parser,
-                                     use_default=config(default_config_field, True))
+        self.__download_config = combine_config(base_config, cfg, parser,
+                                                use_default=config(default_config_field, True))
 
     @property
     def db_client_write(self) -> OngTsdbClient:
@@ -237,7 +262,7 @@ class BaseDownloader(HttpGet):
             if not admin_client.get_metadata(self.database, self.name()):
                 admin_client.set_level_names(self.database, self.name(), df_index_columns)
         admin_client.config_reload()  # Forces config reload in case external changes found
-        self.last_data_ts = self.date_last_data_ts()
+        self.date_last_data_ts()
         self.logger.info(f"Data for {self.name()} available up to {self.last_data_ts}")
 
     @property
@@ -249,10 +274,8 @@ class BaseDownloader(HttpGet):
     def date_last_data_ts(self):
         """Returns last date (for any data in current database)"""
         # Admin client must be used, as it fails if sensor does not exist so there are no permissions for getting date
-        last_date = self.db_client_write.get_lastdate(self.database, self.name())
-        if last_date is None:
-            return None
-        return last_date
+        self.last_data_ts = self.db_client_write.get_lastdate(self.database, self.name())
+        return self.last_data_ts
 
     @abc.abstractmethod
     def min_date(self):
@@ -317,8 +340,25 @@ class BaseDownloader(HttpGet):
             self.__settlement_df = df
         return df
 
-    def settle_xs(self, allow_zero_prices: bool = True, **filter_):
-        """Applies a xs to self.settlement_df with key as values and levels as keys of filter"""
+    def settle_xs(self, allow_zero_prices: bool = True, market=None, commodity=None, instrument=None, area=None,
+                  product=None, offset=None, type=None, maturity=None):
+        """
+        Applies a xs to self.settlement_df with key as values and levels as keys of filter
+        :param allow_zero_prices: True (default) to leave prices=0 as 0, False to replace wthen with None
+        :param market: market from which data is downloaded (Omip, Barchart, EEX...)
+        :param commodity: Generic name of commodity (Power, Gas, CO2....)
+        :param instrument: BL (baseload)/PK (peak load), EUA...
+        :param area: Country (two caps letters, ES, FR, DE, EU...)
+        :param product: # D/W/M/Q/Y for calendar day/week/month/quarter/year
+        :param offset: # Number of calendar products of interval from as_of date till maturity
+        :param type: "close", "adj_close" mainly. Could be also 'maturity'
+        :param maturity: date for filtering maturity to a specific date. It will be converted with pd.Timestamp.
+         So far, it cannot be used together with offset
+        :return: a filtered dataframe
+        """
+        filter_ = dict(market=market, commodity=commodity, instrument=instrument, area=area,
+                       product=product, offset=offset, type=type, maturity=maturity)
+        filter_ = {k: v for k, v in filter_.items() if v}
         maturity_value = None if "maturity" not in filter_ else pd.Timestamp(filter_.pop('maturity'))
         if all(col in filter_ for col in ("maturity", "offset")):
             raise ValueError("Cannot filter by offset and maturity at the same time")
@@ -391,20 +431,31 @@ class BaseDownloader(HttpGet):
         """
         pass
 
+    def iter_download_config(self):
+        """Returns an interator of configurations"""
+        for config in self.__download_config:
+            if config.download_cfg in self.__download_config_filter:
+                yield config
+
     def download(self, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None,
                  force_download: bool = False) -> int:
         """
         Downloads and stores data from a start date to an end date
         :param start_date:
         :param end_date:
-        :param force_download: True to force download again data. Defaults to False (avoid downloading again)
+        :param force_download: True to force download again data. Defaults to False (avoid downloading again).
+        It can be a bool (to download again all data), or a dict or list of dictionaries that will be used
+        as filter to download again just a specific set of commodities. Dict fields must be compatible with
+        commodity_data.series_config.CommodityCfg dataclass. Example: force_download=dict(instrument="BL") will
+        only download baseload products
         :return: the number of downloaded days
         """
+        self.set_force_download_filter(force_download)
         retval = 0
         start_date = pd.Timestamp(start_date or self.min_date())
         end_date = pd.Timestamp(end_date or pd.Timestamp.today().normalize())
         # If there is data already stored, unless force_download avoid downloading data older than 10 years
-        if self.last_data_ts and not force_download:
+        if self.date_last_data_ts() and not force_download:
             start_date = max(start_date, self.last_data_ts.tz_localize(start_date.tz) - pd.offsets.YearBegin(10))
         self.prepare_cache(start_date, end_date, force_download)
         ecb_hols = self.get_holidays(start_date, end_date)
@@ -424,7 +475,7 @@ class BaseDownloader(HttpGet):
                 # Persist Data to hdfs. This is the not-thread-safe part
                 new_data = pd.concat(dfs)
                 if self.__settlement_df is not None:
-                    self.__settlement_df.update(new_data)
+                    self.__settlement_df.update(self.maturity2datetime(new_data))
                     self.__settlement_df.sort_index()
                 else:
                     self.__settlement_df = new_data
@@ -432,6 +483,7 @@ class BaseDownloader(HttpGet):
         if retval and self.__roll_expirations:
             self.logger.info(f"Adjusting expirations for {self.__class__.__name__} {self.name()}")
             self.roll_expiration()
+        self.set_force_download_filter(None)
         return retval
 
     def dump(self, df: pd.DataFrame = None) -> bool:
@@ -477,14 +529,18 @@ class BaseDownloader(HttpGet):
 
         # remove adj_close, ignoring non-existing columns
         settlement_df = self.settlement_df.drop(TypeColumn.adj_close.value, level="type", axis=1,
-                                                         errors="ignore")
+                                                errors="ignore")
         # remove maturity, ignoring non-existing columns
         settlement_df = settlement_df.drop("maturity", level="type", axis=1, errors="ignore")
 
         # Force ordering
         settlement_df = settlement_df.sort_index()
+
+        valid_columns = settlement_df.columns.get_level_values('offset') > 0
+        # Do not roll weeks
+        valid_columns = valid_columns & (settlement_df.columns.get_level_values('product') != "W")
         df_rolls = list()
-        for _, group in settlement_df.T.groupby(["market", "commodity", "area", "product"]):
+        for _, group in settlement_df.loc[:, valid_columns].T.groupby(["market", "commodity", "area", "product"]):
             group = group.T  # As groupby with axis is deprecated, it has to be manually transposed back
             # Just type=close in the group (ignoring any other type)
             group_close = group.xs(TypeColumn.close.value, level="type", axis=1, drop_level=False)

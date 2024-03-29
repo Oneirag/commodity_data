@@ -1,10 +1,11 @@
+from datetime import datetime
+
 import pandas as pd
 
+from commodity_data import logger
 from commodity_data.downloaders.base_downloader import HttpGet
 from commodity_data.downloaders.offsets import date_offset
-from commodity_data import logger
 from commodity_data.series_config import valid_product
-from datetime import datetime
 
 
 def parse_omip_product_maturity_offset(omip_product: str, as_of: pd.Timestamp) -> tuple:
@@ -31,6 +32,10 @@ def parse_omip_product_maturity_offset(omip_product: str, as_of: pd.Timestamp) -
         year = int(date_str[3:])
         maturity = pd.Timestamp(year=(2000 + year), month=quarter * 3 - 2, day=1)
         offset = date_offset(as_of, maturity, "Q")
+    elif omip_product.startswith("Wk"):
+        date_str = omip_product
+        maturity = pd.Timestamp(datetime.strptime(date_str[2:] + '-1', "%W-%y-%w"))
+        offset = date_offset(as_of, maturity, "W")
     else:
         return None, None, None
 
@@ -85,6 +90,7 @@ class Omip_Data(HttpGet):
                 table = table.drop(columns=(n for n in table.columns if n != "Reference prices"))
                 table["close"] = pd.to_numeric(table["Reference prices"], errors='coerce')
                 table = table.dropna(axis=0, how="any")
+                # Todo: rmeove extra nan indexes
                 if table.empty:
                     self.logger.debug(f"No valid data for {as_of}, returning None")
                     return None  # No valid tables found

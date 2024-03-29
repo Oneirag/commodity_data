@@ -30,7 +30,7 @@ class BarchartDownloader(BaseDownloader):
 
     def prepare_cache(self, start_date: pd.Timestamp, end_date: pd.Timestamp, force_download: bool):
         cache = dict()
-        for cfg in self.config:
+        for cfg in self.iter_download_config():
             symbol = cfg.download_cfg.symbol
             df_barchart = self.data.download(symbol, start_date=start_date, end_date=end_date)
             df_barchart.as_of = pd.to_datetime(df_barchart.as_of)
@@ -48,7 +48,7 @@ class BarchartDownloader(BaseDownloader):
             if expiry is not None:
                 maturity = pd.to_datetime(expiry)
                 df_melt['maturity'] = maturity.timestamp()
-                df_melt['offset'] = pd_date_offset(df_melt.as_of.dt, maturity=maturity, period=product)
+                df_melt['offset'] = pd_date_offset(df_melt.as_of.dt, maturity=maturity, product=product)
             else:
                 df_melt['maturity'] = df_melt.as_of.apply(lambda dt: dt.timestamp())
                 df_melt['offset'] = 0  # If no maturity, then it is supposed to be a stock or a spot value

@@ -34,7 +34,7 @@ class EEXDownloader(BaseDownloader):
 
     def _download_date(self, as_of: pd.Timestamp) -> pd.DataFrame:
         all_tables = list()
-        for cfg in self.config:
+        for cfg in self.iter_download_config():
             download_cfg = cfg.download_cfg
             table = self.eex.download_symbol_chain_table(symbol=download_cfg.instrument, date=as_of)
             if table.empty:
@@ -66,7 +66,7 @@ class EEXDownloader(BaseDownloader):
         return df_retval
 
     def min_date(self):
-        min_date = min(self.eex.get_min_date(cfg.download_cfg.instrument) for cfg in self.config)
+        min_date = min(self.eex.get_min_date(cfg.download_cfg.instrument) for cfg in self.download_config)
         return min_date
 
     def get_holidays(self, start_date: pd.Timestamp, end_date: pd.Timestamp) -> dict:
@@ -85,16 +85,22 @@ if __name__ == '__main__':
     # force_download = True
     eex = EEXDownloader(roll_expirations=False)
 
-    eex.delete_all_data()
-    eex.download()
-    exit(0)
-    eex.download(start_date=pd.Timestamp(2023, 1, 1), force_download=force_download)
+    # eex.delete_all_data()
+    # eex.download()
+    # exit(0)
+    # eex.download(start_date=pd.Timestamp(2023, 1, 1), force_download=force_download)
     # eex.download(start_date=pd.Timestamp(2024, 3, 18), force_download=True)
     # year_data = eex.settle_xs(commodity="Power", area="ES", product="Y", offset=1, type="close")
     year_data = eex.settle_xs(commodity="Power", area="ES",  # product="Y",
                               type="close",
                               maturity="2025-1-1",
                               allow_zero_prices=False)
+
+    week_data = eex.settle_xs(commodity="Power", area="ES",  # product="Y",
+                              type="close",
+                              product="W",
+                              allow_zero_prices=False)
+    print(week_data)
 
     import matplotlib.pyplot as plt
 

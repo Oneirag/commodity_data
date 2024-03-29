@@ -50,3 +50,35 @@ class TestEEXDownloader(unittest.TestCase):
             self.assertTrue((maturity[col].dropna() > 0).all(),
                             msg=f"Bad conversion of dates: There are 0 timestamps in column {col}")
         pass
+
+    def test_force_download_filter(self):
+        """Test that force download filter works properly"""
+        all_configs = list(self.eex.iter_download_config())
+        self.assertTrue(len(all_configs) > 0, "No download config returned")
+        # Boolean: all configs must be returned always for True, False (and None also)
+        for bool_filter in True, False, None:
+            self.eex.set_force_download_filter(bool_filter)
+            bool_configs = list(self.eex.iter_download_config())
+            self.assertTrue(len(all_configs) == len(bool_configs), "Expected all configs")
+        # If filter is not valid should raise exception
+        with self.assertRaises(Exception) as ar:
+            self.eex.set_force_download_filter(dict(non_existing_field=True))
+            configs = list(self.eex.iter_download_config())
+        print(f"Raised: {ar.exception}")
+        # Single filters: a dict that returns just one config
+        for simple_filters in [dict(instrument="/E.FEBY"), dict(product="Y", instrument="/E.FEBY"),
+                               [dict(instrument="/E.FEBY"), dict(product="Y", instrument="/E.FEBY")]
+                               ]:
+            self.eex.set_force_download_filter(simple_filters)
+            configs = list(self.eex.iter_download_config())
+            self.assertTrue(len(configs) == 1, "Expected one single config")
+
+        for impossible_filters in [dict(product="Q", instrument="/E.FEBY"), ]:
+            self.eex.set_force_download_filter(impossible_filters)
+            configs = list(self.eex.iter_download_config())
+            self.assertTrue(len(configs) == 0, "Expected no configs")
+
+        for double_filters in [[dict(instrument="/E.FEBY"), dict(instrument="/E.FEBQ")]]:
+            self.eex.set_force_download_filter(double_filters)
+            configs = list(self.eex.iter_download_config())
+            self.assertTrue(len(configs) == 2, "Expected two configs")

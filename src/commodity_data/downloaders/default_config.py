@@ -7,7 +7,7 @@ default_config = {
             "download_cfg": {
                 "instrument": "FTB", "product": "EL", "zone": "ES",
                 # "start_t": "2006-01-01",
-                "start_t": "2006-07-03",  # There is no data availabe before that date
+                "start_t": "2006-07-03",  # There is no data available before that date
             },
             "commodity_cfg": {
                 "commodity": "Power", "instrument": "BL", "area": "ES",
@@ -144,7 +144,7 @@ default_config = {
         *[
             {
                 "download_cfg": {
-                    "instrument": instrument, "product": product, "zone": "ES",
+                    "instrument": instrument, "product": product,
                 },
                 "commodity_cfg": {
                     "commodity": "Power", "instrument": "BL", "area": "ES",
@@ -155,6 +155,7 @@ default_config = {
                 ("/E.FEBM", "M"),        # Spanish Baseload month
                 ("/E.FEBQ", "Q"),        # Spanish Baseload Quarter
                 ("/E.FE_DAILY", "D"),    # Spanish Baseload Day
+                ("/E.FEB_WEEK", "W"),  # Spanish Baseload Week
             ]
         ]
     ]

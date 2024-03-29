@@ -20,7 +20,7 @@ class OmipDownloader(BaseDownloader):
         super().__init__(name="Omip", config_name="omip_downloader", class_schema=OmipConfig,
                          default_config_field="omip_downloader_use_default", roll_expirations=roll_expirations)
         # Calculate the absolute minimum date for download
-        self.__min_date = min(pd.Timestamp(cfg.download_cfg.start_t) for cfg in self.config)
+        self.__min_date = min(pd.Timestamp(cfg.download_cfg.start_t) for cfg in self.download_config)
         self.omip = Omip_Data()
 
     def min_date(self):
@@ -29,7 +29,7 @@ class OmipDownloader(BaseDownloader):
     def _download_date(self, as_of: pd.Timestamp) -> pd.DataFrame:
         dfs = list()
         # for cdty, cdty_config in OmipConfig.commodity_config.items():
-        for cfg in self.config:
+        for cfg in self.iter_download_config():
             cdty = cfg.commodity_cfg.commodity
             self.logger.info(f"Downloading Omip as of {self.as_of_str(as_of)} for {cdty}")
             df = self.omip.download_omip_data(self.as_of_str(as_of), **cfg.download_cfg.__dict__)

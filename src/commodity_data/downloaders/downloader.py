@@ -30,8 +30,9 @@ class CommodityDownloader:
         for mkt, downloader in self.downloaders():
             downloader.download(end_date=yesterday)
 
-    def download(self, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None, force_download: bool = False,
-                 markets: list = None):
+    def download(self, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None,
+                 force_download: bool | list | dict = False,
+                 markets: str | list = None):
         """Same as BaseDownloader.downloaders, but working with all downloaders"""
         for market, downloader in self.downloaders(markets):
             downloader.download(start_date, end_date, force_download=force_download)

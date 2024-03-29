@@ -34,17 +34,17 @@ class TestOffset(unittest.TestCase):
             with self.subTest(**(test_data | dict(as_of=as_of))) as st:
                 self.assertEqual(test_data['offset'], date_offset(as_of,
                                                                   maturity=pd.Timestamp(test_data['maturity']),
-                                                                  period=test_data['period']))
+                                                                  product=test_data['period']))
 
     def test_df_date_offset(self):
         as_of_df = pd.DataFrame(pd.date_range("2024-12-01", "2025-01-31", freq="B"), columns=["as_of"])
         as_of_df['close'] = 0
 
         for maturity, period in [("2024-12-15", "Y"), ("2025-12-15", "Y")]:
-            as_of_df['offset'] = pd_date_offset(as_of_df.as_of.dt, pd.Timestamp(maturity),period=period)
+            as_of_df['offset'] = pd_date_offset(as_of_df.as_of.dt, pd.Timestamp(maturity), product=period)
             for as_of, offset in zip(as_of_df.as_of.values, as_of_df.offset.values):
                 with self.subTest(as_of=as_of, maturity=maturity, period=period):
-                    self.assertEqual(offset, date_offset(pd.Timestamp(as_of), pd.Timestamp(maturity), period=period))
+                    self.assertEqual(offset, date_offset(pd.Timestamp(as_of), pd.Timestamp(maturity), product=period))
 
 
 if __name__ == '__main__':
