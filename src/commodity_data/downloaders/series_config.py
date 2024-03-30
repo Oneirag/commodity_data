@@ -13,7 +13,7 @@ from enum import Enum
 from marshmallow.validate import OneOf
 from marshmallow_dataclass import dataclass
 
-valid_product = "YMQDW"
+from commodity_data.downloaders.products import valid_product
 
 df_index_columns = ["market",  # market from which data is downloaded (Omip, ICE...)
                     "commodity",  # Generic name of commodity (Power, Gas, CO2....)
@@ -28,6 +28,7 @@ df_index_columns = ["market",  # market from which data is downloaded (Omip, ICE
 class TypeColumn(str, Enum):
     close = "close"  # Original settlement price
     adj_close = "adj_close"  # Adjusted settlement price (taking into account product rolling)
+    maturity = "maturity"  # Maturity date of the products
 
 
 @dataclass

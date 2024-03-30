@@ -22,7 +22,10 @@ dl.download_all_yesterday()
 dl.download("2024-3-1", "2024-03-15", markets="EEX")
 
 # Downloading for a market in a certain date. Force download all again even if data existed
-dl.download("2024-3-1", "2024-03-15", markets="EEX", force_download=True)
+dl.download("2024-3-1", "2024-03-07", markets="EEX", force_download=True)
 
 # Force download all history of a certain product
-df.download(markets="EEX", force_download=dict(product="W"))
+if "yes" == input("Type 'yes' to download again weeks from EEX: "):
+    df.download(markets="EEX", force_download=dict(product="W"))  # Download all weeks from EEX
+if "yes" == input("Type 'yes' to download again all power data from Omip: "):
+    df.download(markets="Omip", force_download=dict(product="EL"))  # Download all power from OMIP

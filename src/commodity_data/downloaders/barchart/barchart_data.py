@@ -10,7 +10,8 @@ import pandas as pd
 from ong_utils import get_cookies
 
 from commodity_data import logger
-from commodity_data.downloaders.base_downloader import HttpGet, TypeColumn
+from commodity_data.downloaders.base_downloader import HttpGet
+from commodity_data.downloaders.series_config import TypeColumn
 
 
 class BarchartData(HttpGet):
@@ -29,7 +30,6 @@ class BarchartData(HttpGet):
             # Update cookies
             self.cookies = get_cookies(resp)
             token_header = f"x-{self.token_cookie.lower()}"
-            token_header = "x-XSRF-TOKEN".lower()
             self.headers.update({token_header: urllib.parse.unquote(self.cookies[self.token_cookie])})
 
     def download(self, symbol: str, start_date: pd.Timestamp, end_date: pd.Timestamp = None) -> pd.DataFrame:

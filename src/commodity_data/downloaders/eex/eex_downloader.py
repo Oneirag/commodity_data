@@ -4,8 +4,8 @@ import pandas as pd
 
 from commodity_data.downloaders.base_downloader import BaseDownloader
 from commodity_data.downloaders.eex.eex_data import EEXData
-from commodity_data.downloaders.offsets import date_offset
-from commodity_data.series_config import EEXConfig, df_index_columns
+from commodity_data.downloaders.products import date_offset
+from commodity_data.downloaders.series_config import EEXConfig, df_index_columns
 
 
 class EEXDownloader(BaseDownloader):
@@ -18,7 +18,9 @@ class EEXDownloader(BaseDownloader):
         """
         Product offset typically should be continuous from 1 onwards, stepping from 1 to 1
         However, it can appear a product with strange offsets, that has to be removed
-        :param df:
+        :param df: dataframe with the downloaded results
+        :param symbol: eex symbol, used for logging
+        :param date: asof date of data, used for logging
         :return:
         """
         max_offset = 4

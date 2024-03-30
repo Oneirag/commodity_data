@@ -5,7 +5,7 @@ import unittest
 
 import pandas as pd
 
-from commodity_data.downloaders.offsets import date_offset, pd_date_offset
+from commodity_data.downloaders.products import date_offset, pd_date_offset
 
 
 class TestOffset(unittest.TestCase):

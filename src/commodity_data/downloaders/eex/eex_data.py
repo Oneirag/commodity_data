@@ -10,13 +10,14 @@ import pandas
 import pandas as pd
 from bs4 import BeautifulSoup
 
-from commodity_data import logger, to_delivery_month
+from commodity_data import logger
 from commodity_data.downloaders.base_downloader import HttpGet
+from commodity_data.downloaders.products import to_standard_delivery_month
 
 
 def get_js_var(var_name: str, where: str) -> str:
     """Gets the string of the value of a javascript variable, like a = value"""
-    found = re.findall(f"{var_name}.*\s?=\s?(.*);", where)
+    found = re.findall(rf"{var_name}.*\s?=\s?(.*);", where)
     if found:
         first_found = found[0]
         first_found = first_found.replace(",]", "]")
@@ -110,7 +111,7 @@ class EEXData(HttpGet):
                 fields = snippet.find_all("field")
                 column_mapping = {field['name']: field['description'] for field in fields}
                 script = snippet.find("script")
-                all_symbols = set(re.findall("(\w*)Symbols_", script.text))
+                all_symbols = set(re.findall(r"(\w*)Symbols_", script.text))
                 deliveries = get_js_var("buttons", script.text)
                 for symbol in all_symbols:
                     codes = get_js_var(f"{symbol}Symbols_", script.text)
@@ -287,7 +288,7 @@ class EEXData(HttpGet):
             return
         delivery = symbol_data['delivery'].iat[0]
         if delivery in ("Year", "Quarter", "Month", "Monat"):
-            return symbol + to_delivery_month(maturity)
+            return symbol + to_standard_delivery_month(maturity)
         else:
             return
 
@@ -316,7 +317,8 @@ if __name__ == '__main__':
     for symbol, wrong_date in [
         ("/E.FE_DAILY", "2020-11-11",),
         ("/E.FEBQ", "2020-10-09",),
-        # "2018-10-23", "2018-06-03", "2019-06-05", "2019-06-05", "2019-06-05", "2019-08-07", "2019-08-21", "2019-12-19",
+        # "2018-10-23", "2018-06-03", "2019-06-05", "2019-06-05", "2019-06-05", "2019-08-07",
+        # "2019-08-21", "2019-12-19",
         # "2020-01-31"
     ]:
         # daily_data = eex.download_symbol_chain_table(symbol=symbol['code'].values[0], date=wrong_date)

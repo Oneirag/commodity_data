@@ -1,8 +1,8 @@
 import pandas as pd
 
 from commodity_data.downloaders.base_downloader import BaseDownloader, TypeColumn
-from commodity_data.downloaders.omip.omip_data import Omip_Data
-from commodity_data.series_config import df_index_columns, OmipConfig
+from commodity_data.downloaders.omip.omip_data import OmipData
+from commodity_data.downloaders.series_config import df_index_columns, OmipConfig
 
 
 class OmipDownloader(BaseDownloader):
@@ -21,7 +21,7 @@ class OmipDownloader(BaseDownloader):
                          default_config_field="omip_downloader_use_default", roll_expirations=roll_expirations)
         # Calculate the absolute minimum date for download
         self.__min_date = min(pd.Timestamp(cfg.download_cfg.start_t) for cfg in self.download_config)
-        self.omip = Omip_Data()
+        self.omip = OmipData()
 
     def min_date(self):
         return self.__min_date
@@ -62,7 +62,7 @@ if __name__ == '__main__':
     omip.roll_expiration()
     omip.load()
     # print(omip.download(pd.Timestamp(2016, 1, 1)))
-    #print(omip.download())
+    # print(omip.download())
     omip.settle_xs(commodity="Power", area="ES", product="Y", offset=1).plot()
     plt.show()
 

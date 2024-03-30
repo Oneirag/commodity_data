@@ -1,8 +1,33 @@
 """
-Functions to calculate time offsets between as_of dates and the maturity of a product (YMQDW)
+functions related to products:
+    - List of valid products
+    - Functions to calculate time offsets between as_of dates and the maturity of a product (YMQDW)
+    - Function to format a date into a standard delivery month (e.g. 2024-12-1 -> Z24)
 """
+from datetime import datetime
+
 import pandas as pd
 from pandas.core.indexes.accessors import DatetimeProperties
+
+# These are the products marked as valid
+valid_product = [
+    "Y", "M", "Q", "D", "W"
+]
+
+delivery_months = {
+    "January": "F",
+    "February": "G",
+    "March": "H",
+    "April": "J",
+    "May": "K",
+    "June": "M",
+    "July": "N",
+    "August": "Q",
+    "September": "U",
+    "October": "V",
+    "November": "X",
+    "December": "Z",
+}
 
 
 def pd_date_offset(as_of_series: DatetimeProperties, maturity: pd.Timestamp, product: str) -> list:
@@ -13,7 +38,7 @@ def pd_date_offset(as_of_series: DatetimeProperties, maturity: pd.Timestamp, pro
 
 
 def date_offset(as_of: pd.Timestamp, maturity: pd.Timestamp, product: str) -> int:
-    """Returns difference between two dates in period (YMQD)"""
+    """Returns difference between two dates in period (YMQDW)"""
     if product == "Y":
         return maturity.year - as_of.year
     elif product == "M":
@@ -29,3 +54,8 @@ def date_offset(as_of: pd.Timestamp, maturity: pd.Timestamp, product: str) -> in
         return (maturity - start_week_monday).days // 7
     else:
         raise ValueError(f"Invalid product {product}")
+
+
+def to_standard_delivery_month(maturity: datetime) -> str:
+    """Returns a date converted to standard deliveries. E.g: for datetime(2025,12,3) returns 'Z25'"""
+    return delivery_months[maturity.strftime("%B")] + maturity.strftime("%y")

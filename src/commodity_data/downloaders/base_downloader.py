@@ -14,7 +14,7 @@ from ong_utils import is_debugging, cookies2header
 from commodity_data import config
 from commodity_data import http, logger, get_password
 from commodity_data.downloaders.default_config import default_config
-from commodity_data.series_config import df_index_columns, TypeColumn
+from commodity_data.downloaders.series_config import df_index_columns, TypeColumn
 
 pd.options.mode.chained_assignment = 'raise'  # Raises SettingWithCopyWarning error instead of just warning
 

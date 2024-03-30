@@ -5,8 +5,8 @@ from pandas import DataFrame, Series
 
 from commodity_data.downloaders.barchart.barchart_data import BarchartData
 from commodity_data.downloaders.base_downloader import BaseDownloader, TypeColumn
-from commodity_data.downloaders.offsets import pd_date_offset
-from commodity_data.series_config import BarchartConfig
+from commodity_data.downloaders.products import pd_date_offset
+from commodity_data.downloaders.series_config import BarchartConfig
 
 
 class BarchartDownloader(BaseDownloader):
