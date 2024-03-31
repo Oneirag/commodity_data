@@ -19,6 +19,18 @@ from commodity_data.downloaders.series_config import df_index_columns, TypeColum
 pd.options.mode.chained_assignment = 'raise'  # Raises SettingWithCopyWarning error instead of just warning
 
 
+def update_dataframe(old_df: pd.DataFrame, new_data: pd.DataFrame) -> pd.DataFrame:
+    """Updates an old_df adding columns and rows of the new data dataframe"""
+    if old_df is not None and not old_df.empty:
+        # old_df.update(new_data)
+        # old_df.loc[new_data.index, new_data.columns] = new_data
+        retval = old_df.combine_first(new_data)
+        retval.sort_index(inplace=True)
+        return retval
+    else:
+        return new_data
+
+
 class StoreDataException(Exception):
     """Exception raised when dump failed"""
     pass
@@ -184,9 +196,8 @@ class BaseDownloader(HttpGet):
         self.__settlement_df = None
         self.cache = None
         self.last_data_ts = None
-        self.__download_config = None
-        self.create_config(config_name, class_schema, default_config_field)
-        self.__download_config_filter = None
+        self.__download_config = self.create_config(config_name, class_schema, default_config_field)
+        self.__download_config_filter = list()
         self.set_force_download_filter(None)  # Initialize, just in case
 
     @property
@@ -224,14 +235,16 @@ class BaseDownloader(HttpGet):
                 self.logger.warning(f"Could not delete market data '{self.name()}' from database '{self.database}'")
                 return False
 
-    def create_config(self, config_field: str, class_schema, default_config_field: str):
+    def create_config(self, config_field: str, class_schema, default_config_field: str) -> list:
+        """Returns a list so it can be overridden in child classes"""
         if not self.name() in default_config:
             raise ValueError(f"Could not find {self.name()} in default configuration")
         base_config = default_config[self.name()]
         cfg = config(config_field, dict())
         parser = marshmallow_dataclass.class_schema(class_schema)()
-        self.__download_config = combine_config(base_config, cfg, parser,
-                                                use_default=config(default_config_field, True))
+        retval = combine_config(base_config, cfg, parser,
+                                use_default=config(default_config_field, True))
+        return retval
 
     @property
     def db_client_write(self) -> OngTsdbClient:
@@ -464,6 +477,8 @@ class BaseDownloader(HttpGet):
         as_of_dates = pd.bdate_range(start_date, end_date, holidays=ecb_hols, freq="C")
         # Chunked in months (20 Business days aprox)
         for as_of_chunk in np.array_split(as_of_dates, 20):
+            if as_of_chunk.empty:
+                break  # No additional downloads
             # In case of debugging, don't use multiprocessing
             # map_func = map if self.cache is not None or is_debugging() else multiprocessing.Pool(4).map
             map_func = map if self.cache is not None or is_debugging() else multiprocessing.pool.ThreadPool(4).map
@@ -475,17 +490,14 @@ class BaseDownloader(HttpGet):
             if dfs:
                 retval += len(dfs)
                 # Persist Data to hdfs. This is the not-thread-safe part
-                new_data = pd.concat(dfs)
-                if self.__settlement_df is not None:
-                    self.__settlement_df.update(self.maturity2datetime(new_data))
-                    self.__settlement_df.sort_index()
-                else:
-                    self.__settlement_df = new_data
+                new_data = self.maturity2datetime(pd.concat(dfs))
+                self.__settlement_df = update_dataframe(self.__settlement_df, new_data)
                 self.dump(new_data)
         if retval and self.__roll_expirations:
             self.logger.info(f"Adjusting expirations for {self.__class__.__name__} {self.name()}")
             self.roll_expiration()
         self.set_force_download_filter(None)
+        self.verify_database()  # Metadata might have been deleted...
         return retval
 
     def dump(self, df: pd.DataFrame = None) -> bool:
@@ -497,7 +509,7 @@ class BaseDownloader(HttpGet):
         # write to database
         # Be careful with maturity: it cannot be saved as date and has to be converted to timestamp
         df = self.maturity2timestamp(df)
-        retval = self.db_client_write.write_df(self.database, self.name(), df)
+        retval = self.db_client_write.write_df(self.database, self.name(), df, fill_value=np.nan)
         if not retval:
             self.logger.error("Could not dump data")
             self.logger.info("Try to update proxy password using set_proxy_user_password() of __init__")
