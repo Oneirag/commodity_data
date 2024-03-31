@@ -359,6 +359,8 @@ class BaseDownloader(HttpGet):
         filter_ = dict(market=market, commodity=commodity, instrument=instrument, area=area,
                        product=product, offset=offset, type=type, maturity=maturity)
         filter_ = {k: v for k, v in filter_.items() if v}
+        if any(isinstance(v, (list, tuple)) for v in filter_.values()):
+            raise NotImplementedError("Filter for multiple values is not implement yet")
         maturity_value = None if "maturity" not in filter_ else pd.Timestamp(filter_.pop('maturity'))
         if all(col in filter_ for col in ("maturity", "offset")):
             raise ValueError("Cannot filter by offset and maturity at the same time")
