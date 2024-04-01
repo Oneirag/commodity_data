@@ -1,16 +1,17 @@
 # Commodity_data
-Downloads commodity data from the Futures markets operators. Currently, Omip (www.omip.pt) and barchart (for ICE EUA, FX, Crypto and Stocks) are available
+Downloads commodity data from the Futures markets operators. Currently, Omip (www.omip.pt), EEX (www.eex.com) and barchart (for ICE EUA, FX, Crypto and Stocks) are available
 Data is stored in a ong_tsdb dabatase accessible through a configuration using ong_utils.
+There are specific classes also to download data in pandas dataframe format from the same sources
 
 ## Detailed explanation of index columns:
                    
-* **market**: Name of the market. Currently, Omip (ES, FR and DE baseload&peak, PVB) and Barchasrt (EUA, Stocks, Crypto, FX)
+* **market**: Name of the market. Currently, Omip (ES, FR and DE baseload&peak, PVB), EEX (Spanish power, but others could be used) and Barchart (EUA, Stocks, Crypto, FX)
 * **commodity**: Generic name of commodity (Power, Gas, CO2....)
 * **instrument**: BL (baseload)/PK (peakload), EUA...
 * **area**: Country (ES, FR, DE...)
 * **product**: M, Q, Y, W, or D for month, quarter, year, week, day
 * **offset**,  number of relative products from each as_of to first delivery of the product 
-* **type**,  "close" for original prices, "adj_close" for continuous prices adjusted rolling to next offset at expirations
+* **type**,  "close" for original prices, "adj_close" for continuous prices adjusted rolling to next offset at expirations, "maturity" for the starting date of the delivery period as a timestamp
 
 ## Default downloaded data
 See `commodity_data/downloaders/default_config.py` for the details of all default 
@@ -20,19 +21,25 @@ Should you need additional data to be downloaded (with barchart), you'll need to
 As a summary of default downloaded data:
 
 ### Omip
-With commodity="omip", downloads the following instruments for calendar Day, Month, Quarter and Year deliveries and baseload only: 
-* Spanish BL Power Futures
-* German BL Power Futures
-* French BL Power Futures
-* Spanish Gas Futures
+Downloads the following instruments for calendar Day, Month, Quarter and Year deliveries and baseload only: 
+* Spanish BL Power Futures (market="Omip", commodity="Power", area="ES", instrument="BL")
+* German BL Power Futures (market="Omip", commodity="Power", area="DE", instrument="BL")
+* French BL Power Futures (market="Omip", commodity="Power", area="FR", instrument="BL")
+* Spanish Gas Futures (market="Omip", commodity="Gas", area="ES", instrument="BL")
 ### Barchart
 Downloads the following info:
 * CO2 Emissions: with commodity="CO2", downloads EUA settle for december up to year + 4
 * Cryptocurrencies: with commodity="Crypto", Ethereum and Bitcoin
 * Fiat foreign exchange: with commodity="FX" Euro to Dolar and Euro to British Pound
 * Stocks: with commodity="Stocks", Endesa, Ibex35 index and Apple
+### EEX
+* Spanish BL Power Futures (market="EEX", commodity="Power", area="ES", instrument="BL")
+
 
 ## Usage
+### Standalone
+You can download prices directly from the sources to pandas dataframes, see examples in the samples folder
+
 ### Prerequisites
 #### Run underlying `ong_tsdb` database
 This library relies on an [ong_tsdb](https://github.com/Oneirag/ong_tsdb.git) database that must be running and 
@@ -125,6 +132,13 @@ for commodity in ("CO2", "FX", "Crypto", "Stock"):
         barchart.settle_xs(commodity=commodity, offset=0).plot()
     plt.show()
     # mpld3.show(port=mpld3_port)
+
+```
+#### Downloading from EEX
+```python
+from commodity_data.downloaders import EEXDownloader
+eex = EEXDownloader()
+
 
 ```
 

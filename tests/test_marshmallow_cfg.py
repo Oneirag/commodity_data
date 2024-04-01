@@ -5,8 +5,7 @@ import unittest
 import marshmallow_dataclass
 import marshmallow
 from commodity_data.series_config import BarchartConfig, OmipConfig
-from commodity_data.downloaders.barchart.barchart_downloader import barchart_cfg
-from commodity_data.downloaders.default_config import omip_cfg
+from commodity_data.downloaders.default_config import default_config
 
 
 class TestMarshmallow(unittest.TestCase):
@@ -14,13 +13,13 @@ class TestMarshmallow(unittest.TestCase):
     def test_omip_main_config(self):
         """Tests the Omip config, no exception should be risen"""
         omip = marshmallow_dataclass.class_schema(OmipConfig)()
-        for item in omip_cfg:
+        for item in default_config['Omip']:
             print(omip.load(item))
 
     def test_barchart_main_config(self):
         """Tests the barchart config, no exception should be risen"""
         barchart = marshmallow_dataclass.class_schema(BarchartConfig)()
-        for item in barchart_cfg:
+        for item in default_config['Barchart']:
             print(barchart.load(item))
 
     def test_barchart_sample_config(self):
