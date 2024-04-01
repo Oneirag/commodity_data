@@ -2,7 +2,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from commodity_data import logger
+from commodity_data.common import logger
 from commodity_data.downloaders.base_downloader import HttpGet
 from commodity_data.downloaders.products import date_offset
 

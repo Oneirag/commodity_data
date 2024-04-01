@@ -6,8 +6,8 @@ from unittest import TestCase, main
 
 import numpy as np
 
-from commodity_data.downloaders.barchart.barchart_downloader import BarchartDownloader
-from commodity_data.downloaders.base_downloader import consecutive, roll
+from commodity_data.downloaders import BarchartDownloader, OmipDownloader
+from commodity_data.downloaders.continuous_prices import calculate_continuous_prices, roll, consecutive
 from commodity_data.downloaders.series_config import TypeColumn
 
 
@@ -24,6 +24,7 @@ class TestDownloader(TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.ice = BarchartDownloader()
+        cls.omip = OmipDownloader()
 
     def test_roll_simple(self):
         """Tests a battery of simple rollings"""
@@ -64,7 +65,7 @@ class TestDownloader(TestCase):
             # Fifth case: dual expiration
             dict(
                 prc1=np.array([1, 2, np.nan, np.nan, 1, 2, np.nan, np.nan, 1, 2]),
-                prc2=np.array([1, 2,       3,     4, 2, 3,      4,      5, 6, 7]),
+                prc2=np.array([1, 2, 3, 4, 2, 3, 4, 5, 6, 7]),
                 expiry=np.array([3, 7]),
                 offset=0,
                 expected_result=[1, 2, 3, 4, 1, 2, 3, 4, 0, 1],
@@ -77,6 +78,27 @@ class TestDownloader(TestCase):
                                      test['expected_result'],
                                      msg=f"Failed in test case {idx}: {test}")
             print(f"Test case {idx} OK")
+
+    def test_roll_expiration_omip(self):
+        """Tests that adj_close values in Omip are valid"""
+        if not self.omip.date_last_data_ts():
+            self.omip.download()
+        for roll_offset in reversed(range(1)):
+            settlement_df = self.omip.settlement_df
+            settlement_df = settlement_df.drop("adj_close", level="type", axis=1, errors="ignore")
+            rolled = calculate_continuous_prices(
+                settlement_df, valid_products=["Y", "W"], roll_offset=roll_offset
+            )
+            filter_roll = dict(commodity="Power", product="Y", offset=1, area="ES", type="adj_close")
+            prompt_year = rolled.xs(tuple(filter_roll.values()), level=tuple(filter_roll.keys()), axis=1,
+                                    drop_level=False)
+            # Remove first year, as there was not y+2 data during 2007
+            start_year = 2007
+            number_of_nans = (prompt_year[start_year:].isna().sum()).iat[0]
+            # Allow 1 nan per year as max
+            self.assertLessEqual(number_of_nans, prompt_year.index[-1].year - start_year,
+                                 "Found too many nan values in prompt year"
+                                 )
 
     def test_roll_expiration_ice(self):
         """Test that expiration on ice contracts work properly"""

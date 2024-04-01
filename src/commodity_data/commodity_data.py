@@ -1,6 +1,6 @@
 import pandas as pd
 
-from commodity_data import logger
+from commodity_data.common import logger
 from commodity_data.downloaders import EEXDownloader, OmipDownloader, BarchartDownloader
 from commodity_data.downloaders.base_downloader import BaseDownloader, FilterKeyNotFoundException
 

@@ -1,7 +1,7 @@
 """"
 Examples on how to download data
 """
-from commodity_data.commodity_data import CommodityData
+from commodity_data import CommodityData
 
 ######################
 # Creating downloader (Creates also the underlying database if not existing)
@@ -30,3 +30,4 @@ if "yes" == input("Type 'yes' to download again weeks from EEX: "):
 if "yes" == input("Type 'yes' to download again all power data from Omip: "):
     # Force download all power from OMIP
     cdty.download(markets="Omip", start_date="2015-01-01", force_download=dict(product="EL"))
+

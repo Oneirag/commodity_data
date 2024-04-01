@@ -10,7 +10,7 @@ import pandas
 import pandas as pd
 from bs4 import BeautifulSoup
 
-from commodity_data import logger
+from commodity_data.common import logger
 from commodity_data.downloaders.base_downloader import HttpGet
 from commodity_data.downloaders.products import to_standard_delivery_month
 

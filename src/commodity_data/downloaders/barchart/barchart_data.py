@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from ong_utils import get_cookies
 
-from commodity_data import logger
+from commodity_data.common import logger
 from commodity_data.downloaders.base_downloader import HttpGet
 from commodity_data.downloaders.series_config import TypeColumn
 

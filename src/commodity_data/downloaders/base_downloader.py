@@ -11,8 +11,9 @@ import pyotp
 from ong_tsdb.client import OngTsdbClient
 from ong_utils import is_debugging, cookies2header
 
-from commodity_data import config
-from commodity_data import http, logger, get_password
+from commodity_data import get_password
+from commodity_data.common import config, logger, http
+from commodity_data.downloaders.continuous_prices import calculate_continuous_prices
 from commodity_data.downloaders.default_config import default_config
 from commodity_data.downloaders.series_config import df_index_columns, TypeColumn
 
@@ -41,13 +42,6 @@ class FilterKeyNotFoundException(Exception):
     pass
 
 
-# To convert standard frequencies into products
-freqs = dict(Y="year",
-             Q="quarter",
-             M="month",
-             D="day")
-
-
 class GoogleAuth(pyotp.TOTP):
     last_otp = ""
 
@@ -62,11 +56,6 @@ class GoogleAuth(pyotp.TOTP):
         otp = super().now()
         GoogleAuth.last_otp = otp
         return otp
-
-
-def product_to_date(obj, product: str):
-    """Transforms product as string (Y/M/Q/D) into functions call to datetime objects"""
-    return getattr(obj, freqs[product])
 
 
 def combine_config(default_config: list, config: list, parser, use_default: bool = True) -> list:
@@ -539,59 +528,21 @@ class BaseDownloader(HttpGet):
         :param roll_offset: number of days before expiration to roll the contract
         :return: None
         """
-
-        def column_idx(index, names, **kwargs):
-            idx = tuple(kwargs.get(name, idx) for name, idx in zip(names, index))
-            return idx
-
         # remove adj_close, ignoring non-existing columns
-        settlement_df = self.settlement_df.drop(TypeColumn.adj_close.value, level="type", axis=1,
+        settlement_df = self.settlement_df.drop(TypeColumn.adj_close, level="type", axis=1,
                                                 errors="ignore")
         # remove maturity, ignoring non-existing columns
-        settlement_df = settlement_df.drop("maturity", level="type", axis=1, errors="ignore")
+        # settlement_df = settlement_df.drop(TypeColumn.maturity, level="type", axis=1, errors="ignore")
 
         # Force ordering
         settlement_df = settlement_df.sort_index()
 
-        valid_columns = settlement_df.columns.get_level_values('offset') > 0
-        # Do not roll weeks
-        valid_columns = valid_columns & (settlement_df.columns.get_level_values('product') != "W")
-        df_rolls = list()
-        for _, group in settlement_df.loc[:, valid_columns].T.groupby(["market", "commodity", "area", "product"]):
-            group = group.T  # As groupby with axis is deprecated, it has to be manually transposed back
-            # Just type=close in the group (ignoring any other type)
-            group_close = group.xs(TypeColumn.close.value, level="type", axis=1, drop_level=False)
-            if group_close.empty:
-                continue
-            index = group.columns[0]
-            self.logger.info(f"Processing rolling of {index[:-1]}")
-            product = group_close.columns.get_level_values("product").unique()[0]
-            # Take offsets from the last row of available data
-            last_available_row = np.argwhere(~group_close.isna().all(axis=1).values).max()
-            max_offset = group_close.iloc[
-                last_available_row,
-                np.argwhere(~group_close.iloc[last_available_row, :].isna().values).flatten()  # not null columns
-            ].xs(TypeColumn.close.value, level='type').index.get_level_values('offset').max()
-            for offset in range(1, int(max_offset)):
-                df_prod_0 = group_close.loc[:,
-                            column_idx(index, df_index_columns, offset=offset, type=TypeColumn.close.value)]
-                df_prod_1 = group_close.loc[:,
-                            column_idx(index, df_index_columns, offset=offset + 1, type=TypeColumn.close.value)]
-                expirations = np.argwhere(np.diff(product_to_date(df_prod_0.index, product)) != 0).flatten()
-
-                # df_prod_1 should not have nans, so fill them
-                roll_values = roll(df_prod_0.values, df_prod_1.ffill().values, expirations, roll_offset)
-                df_roll = pd.Series(roll_values, index=df_prod_0.index,
-                                    name=column_idx(index, df_index_columns, offset=offset,
-                                                    type=TypeColumn.adj_close.value))
-                df_rolls.append(df_roll)
+        settlement_df = calculate_continuous_prices(settlement_df, roll_offset=roll_offset)
 
         # Update with the changes
         self.__settlement_df = settlement_df
         # Append all rollings at the same time to avoid performance warning due to heavy fragmentation
-        ns = self.__settlement_df.columns.names
-        self.__settlement_df = pd.concat([self.settlement_df, *df_rolls], axis=1)
-        self.__settlement_df.columns.names = ns
+
         self.dump(self.__settlement_df)  # Full dump due to rolling adjustments
         return None
 
@@ -605,52 +556,3 @@ class BaseDownloader(HttpGet):
             return as_of
         else:
             return as_of.strftime(self.date_format)
-
-
-def consecutive(data, stepsize=1):
-    """Returns groups of consecutive values in data of size greater than stepsize"""
-    return np.split(data, np.where(np.diff(data) != stepsize)[0] + 1)
-
-
-def roll(price1: np.array, price2: np.array, expirations: np.array, roll_offset: int = 0) -> np.array:
-    """
-    Returns price1 rolled to price2 at given expiration dates
-    :param price1: daily prices of the front contract (np array)
-    :param price2: daily prices of the second front contract (that will be used to roll). Same size as price1. It
-    SHOULD NOT CONTAIN NANs, they must be filled with .fillna(method="ffill").values (for pandas Series/DataFrame)
-    :param expirations: index of expiry of the contract of price1
-    :param roll_offset: number of days before expiry for doing contract rolling (by default 0, roll at expiry)
-    :return: an array of same size as price1 with the price rolled: it means at expiry - roll_offset, the price1
-    is turned to be price2 minus the gap between price1 and price2. Moreover, it takes into account that sometimes
-    prices cease to be published before expiry (and they are nan) so expiry date is actually the date where last
-    nan is found before official expiry index
-    """
-    price_roll = price1.copy()
-    nan_indexes = np.argwhere(np.isnan(price1)).flatten()
-
-    # If df_roll ends with a nan, add a fake expiration date to it, so it is forced to roll
-    if nan_indexes.size != 0 and nan_indexes[-1] == len(price1 - 1):
-        expirations = np.append(expirations, nan_indexes[-1])
-
-    # Returns a reversed list of tuples with of start (including offset) and end indexes of nan consecutive groups
-    nan_indexes_groups = list((max(0, v[0] - roll_offset - 1), v[-1])
-                              for v in reversed(consecutive(nan_indexes)) if len(v))
-
-    for expiry in reversed(expirations):
-        idx_start = expiry - roll_offset
-        idx_end = expiry
-        for nan_group in nan_indexes_groups:
-            if nan_group[0] <= expiry <= nan_group[-1]:
-                idx_start, idx_end = nan_group
-                nan_indexes_groups.remove(nan_group)
-                break
-
-        prc_roll_1 = price1[idx_start]
-        prc_roll_2 = price2[idx_start]
-        roll_value = prc_roll_2 - prc_roll_1
-        # Fill with the following contract in expiration
-        price_roll[idx_start:idx_end + 1] = price2[idx_start:idx_end + 1]
-        # Do contract rolling
-        price_roll[idx_start:] -= roll_value
-
-    return price_roll

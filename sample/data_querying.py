@@ -3,7 +3,7 @@ Examples on how to query already downloaded data
 """
 import pandas as pd
 
-from commodity_data.commodity_data import CommodityData
+from commodity_data import CommodityData
 
 
 def plot(df: pd.DataFrame, use_pdld3: bool = False):
