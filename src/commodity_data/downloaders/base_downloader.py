@@ -1,4 +1,5 @@
 import abc
+import logging
 import multiprocessing.pool
 import time
 
@@ -9,13 +10,12 @@ import ong_tsdb.exceptions
 import pandas as pd
 import pyotp
 from ong_tsdb.client import OngTsdbClient
-from ong_utils import is_debugging, cookies2header
+from ong_utils import is_debugging, cookies2header, OngTimer
 
-from commodity_data import get_password
-from commodity_data.common import config, logger, http
 from commodity_data.downloaders.continuous_prices import calculate_continuous_prices
 from commodity_data.downloaders.default_config import default_config
 from commodity_data.downloaders.series_config import df_index_columns, TypeColumn
+from commodity_data.globals import config, logger, http, get_password
 
 pd.options.mode.chained_assignment = 'raise'  # Raises SettingWithCopyWarning error instead of just warning
 
@@ -501,10 +501,13 @@ class BaseDownloader(HttpGet):
         # write to database
         # Be careful with maturity: it cannot be saved as date and has to be converted to timestamp
         df = self.maturity2timestamp(df)
-        retval = self.db_client_write.write_df(self.database, self.name(), df, fill_value=np.nan)
+        msg = f"Writing data of size {df.shape} to database"
+        self.logger.info(msg)
+        with OngTimer(logger=self.logger, msg=msg, log_level=logging.INFO):
+            retval = self.db_client_write.write_df(self.database, self.name(), df, fill_value=np.nan)
         if not retval:
             self.logger.error("Could not dump data")
-            self.logger.info("Try to update proxy password using set_proxy_user_password() of __init__")
+            self.logger.info("Try to update proxy password using set_proxy_user_password() of commodity_data.common.py")
             raise StoreDataException("Could not dump data")
         return retval
 
