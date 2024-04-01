@@ -46,16 +46,13 @@ tabular_data.to_csv("all_data.csv")
 # Filtering data. Use settle_xs to filter columns that will be returned. It returns all not None rows
 ###
 # This will return Omip and EEX data for the prompt year and Quarter
-try:
-    df = cdty.settle_xs(commodity="Power", area="ES", product=("Y", "Q"), offset=1, type="close")
-    plot(df)
-except NotImplementedError as nie:
-    print(f"Functionality not implemented yet: {nie}")
-# This returns closes for both Omip and EEX data for the prompt year
+df = cdty.settle_xs(commodity="Power", area="ES", product=["Y", "Q"], offset=1, type="close")
+plot(df)
+# This returns closes for both Omip and EEX data, just for the prompt year
 df = cdty.settle_xs(commodity="Power", area="ES", product="Y", offset=1, type="close")
 plot(df)
 # This returns adj_closes for both Omip and EEX data for the prompt year
-# adj_closes adjusts closes of products so there are not steps on product expirations, as it
+# adj_closes adjusts closes of products so there are no steps on product expirations, as it
 # assumes that the product is rolled on expiration
 df = cdty.settle_xs(commodity="Power", area="ES", product="Y", offset=1, type="adj_close")
 plot(df)

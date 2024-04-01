@@ -33,17 +33,24 @@ class TestFakeDownloader(unittest.TestCase):
     def test_concat_downloads(self):
         """Test that data downloaded in different dates concatenates properly"""
         min_date = self.downloader.min_date()
-        date1 = min_date
-        date2 = min_date + pd.offsets.BDay(1)
-        data1 = self.downloader._download_date(date1)
-        data2 = self.downloader._download_date(date2)
-        print(data1)
-        print(data2)
+        dates = pd.date_range(min_date, periods=3, freq="1B")
+        generated_data = [
+            self.downloader._download_date(dates[0]),
+            self.downloader._download_date(dates[1]),
+            self.downloader.generate_fake_data(dates[2], add_spot=False, add_day_ahead=False, add_month_ahead=True)
+        ]
+        print(generated_data)
         data = pd.DataFrame()
-        if data.empty:
-            data = data1
-        data = update_dataframe(data, data2)
-        self.assertTrue(data[data.index.isin(data2.index)][data2.columns].equals(data2))
+        for new_data in generated_data:
+            data = update_dataframe(data, new_data)
+        print(data)
+        for data_comp in generated_data:
+            with self.subTest(date=data_comp.index):
+                data_as_of = data[data.index.isin(data_comp.index)]
+                self.assertTrue(data_as_of[data_comp.columns].equals(data_comp),
+                                f"Failed: data downloaded does not match data merged for {data_comp.index}")
+                self.assertTrue(data_as_of[data.columns.difference(data_comp.columns)].isna().all().all(),
+                                f"Failed: data not downloaded is not null for {data_comp.index}")
 
     @classmethod
     def tearDownClass(cls):

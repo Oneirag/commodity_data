@@ -30,6 +30,6 @@ class TestCommodityData(unittest.TestCase):
                 self.assertTrue(close_nat_maturity.empty,
                                 f"There are zero close values instead of None for {col[:-1]}. "
                                 f"\nActual data starts in {not_null_maturity.index[0]}. "
-                                f"\nZero values fro dates: {close_nat_maturity.index}")
+                                f"\nZero values for dates: {close_nat_maturity.index}")
                 self.assertTrue((close_nat_maturity == 0).all(),
                                 f"Non zero close values for {col[:-1]}")

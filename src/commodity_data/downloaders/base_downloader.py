@@ -372,8 +372,6 @@ class BaseDownloader(HttpGet):
         filter_ = dict(market=market, commodity=commodity, instrument=instrument, area=area,
                        product=product, offset=offset, type=type, maturity=maturity)
         filter_ = {k: v for k, v in filter_.items() if v}
-        if any(isinstance(v, (list, tuple)) for v in filter_.values()):
-            raise NotImplementedError("Filter for multiple values is not implement yet")
         maturity_value = None if "maturity" not in filter_ else pd.Timestamp(filter_.pop('maturity'))
         if all(col in filter_ for col in ("maturity", "offset")):
             raise ValueError("Cannot filter by offset and maturity at the same time")
@@ -383,8 +381,13 @@ class BaseDownloader(HttpGet):
         else:
             filter_df = self.settlement_df
         try:
-            retval = filter_df.xs(key=tuple(filter_.values()), level=tuple(filter_.keys()), axis=1,
-                                  drop_level=False)
+            retval = filter_df
+            for level, key in filter_.items():
+                if isinstance(key, (list, tuple)):
+                    # key = tuple(key)
+                    retval = retval.loc[:, retval.columns.get_level_values(level).isin(key)]
+                else:
+                    retval = retval.xs(key=key, level=level, axis=1, drop_level=False)
             if maturity_value:
                 names = list(retval.columns.names)
                 names.remove("offset")
