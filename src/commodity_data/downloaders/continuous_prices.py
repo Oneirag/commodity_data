@@ -5,8 +5,8 @@ This will calculate the adj_close column of settlement_df
 import numpy as np
 import pandas as pd
 
-from commodity_data.common import logger
 from commodity_data.downloaders.series_config import TypeColumn, df_index_columns
+from commodity_data.globals import logger
 
 
 def consecutive(data, stepsize=1):

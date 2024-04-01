@@ -10,9 +10,9 @@ import pandas
 import pandas as pd
 from bs4 import BeautifulSoup
 
-from commodity_data.common import logger
 from commodity_data.downloaders.base_downloader import HttpGet
 from commodity_data.downloaders.products import to_standard_delivery_month
+from commodity_data.globals import logger
 
 
 def get_js_var(var_name: str, where: str) -> str:
