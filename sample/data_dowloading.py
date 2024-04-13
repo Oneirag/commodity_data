@@ -10,7 +10,7 @@ from commodity_data import CommodityData
 cdty = CommodityData(roll_expirations=False)
 
 # Option1: create the global downloader
-cdty = CommodityData()
+# cdty = CommodityData()
 
 #######################
 # Downloading data
@@ -22,7 +22,7 @@ cdty.download_all_yesterday()
 cdty.download("2024-3-1", "2024-03-15", markets="EEX")
 
 # Downloading for a market in a certain date. Force download all again even if data existed
-cdty.download("2024-3-1", "2024-03-07", markets="EEX", force_download=True)
+cdty.download("2024-3-26", "2024-03-27", markets="Omip", force_download=True)
 
 # Force download all history of a certain product
 if "yes" == input("Type 'yes' to download again weeks from EEX: "):

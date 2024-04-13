@@ -511,6 +511,15 @@ class BaseDownloader(HttpGet):
             raise StoreDataException("Could not dump data")
         return retval
 
+    def delete_dates(self, start_date: pd.Timestamp, end_date: pd.Timestamp, reload: bool = True):
+        """Deletes data from a specific date, by writing NaNs to all its values, including adjusted closes"""
+        all_data = self.settlement_df
+        all_data[start_date:end_date] = None
+        settle = all_data[start_date:end_date]
+        dump_ok = self.dump(settle)
+        if dump_ok and reload:
+            self.load()
+
     def load(self):
         """Loads settlement_df from database"""
         if self.date_last_data_ts() is None:
@@ -524,11 +533,15 @@ class BaseDownloader(HttpGet):
             self.__settlement_df.sort_index(inplace=True, axis=1)
             self.maturity2datetime()
 
-    def roll_expiration(self, roll_offset=0) -> None:
+    def roll_expiration(self, roll_offset=0, valid_products: list = None, valid_commodities: list = None,
+                        valid_areas: list = None) -> None:
         """
         Rolls product after expiration date
         second column is offset=2. After expiration, first column should have a nan value
         :param roll_offset: number of days before expiration to roll the contract
+        :param valid_products: optional list of products, to roll just the products in that list
+        :param valid_commodities: optional list of commodities, to roll just the commodities in that list
+        :param valid_areas: optional list of areas, to roll just the areas in that list
         :return: None
         """
         # remove adj_close, ignoring non-existing columns
@@ -540,7 +553,9 @@ class BaseDownloader(HttpGet):
         # Force ordering
         settlement_df = settlement_df.sort_index()
 
-        settlement_df = calculate_continuous_prices(settlement_df, roll_offset=roll_offset)
+        settlement_df = calculate_continuous_prices(settlement_df, roll_offset=roll_offset,
+                                                    valid_products=valid_products, valid_commodities=valid_commodities,
+                                                    valid_areas=valid_areas)
 
         # Update with the changes
         self.__settlement_df = settlement_df
