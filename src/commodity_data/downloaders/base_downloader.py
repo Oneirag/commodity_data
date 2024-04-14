@@ -557,11 +557,14 @@ class BaseDownloader(HttpGet):
                                                     valid_products=valid_products, valid_commodities=valid_commodities,
                                                     valid_areas=valid_areas)
 
-        # Update with the changes
-        self.__settlement_df = settlement_df
-        # Append all rollings at the same time to avoid performance warning due to heavy fragmentation
+        diff_columns = [c for c in settlement_df.columns if c not in self.settlement_df or
+                        (settlement_df[c].fillna(0) != self.settlement_df[c].fillna(0)).any()]
+        if diff_columns:
+            # Update with the changes
+            self.__settlement_df = settlement_df
+            # Append all rollings at the same time to avoid performance warning due to heavy fragmentation
 
-        self.dump(self.__settlement_df)  # Full dump due to rolling adjustments
+            self.dump(self.__settlement_df[diff_columns])  # Full dump due to rolling adjustments
         return None
 
     @abc.abstractmethod

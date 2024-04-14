@@ -2,7 +2,8 @@
 Sample for downloading data and do some plots
 """
 from commodity_data.downloaders import OmipDownloader, BarchartDownloader, EEXDownloader, BaseDownloader
-import matplotlib.pyplot as plt
+
+
 # import mpld3
 
 
@@ -34,7 +35,7 @@ if __name__ == '__main__':
     print(omip.settlement_df)  # Actual data. No need to invoke download()
 
     for product in "YMQD":
-        omip.settle_xs(market="Omip", commodity="Power", area="ES", product=product, offset=slice(1, 2)).plot()
+        omip.settle_xs(markets="Omip", commodity="Power", area="ES", product=product, offset=slice(1, 2)).plot()
         plt.title(product)
         plt.show()
     # exit(0)
