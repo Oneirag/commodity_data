@@ -2,13 +2,12 @@
 File to read futures data from eex web site
 """
 import json
-import re
-from pathlib import Path
-from typing import List
-
 import pandas
 import pandas as pd
+import re
 from bs4 import BeautifulSoup
+from pathlib import Path
+from typing import List
 
 from commodity_data.downloaders.base_downloader import HttpGet
 from commodity_data.downloaders.products import to_standard_delivery_month
@@ -264,7 +263,7 @@ class EEXData(HttpGet):
 
     def get_eex_symbol(self, market: str, delivery=None, type_=None) -> List[str]:
         """Gets a list of the EEX market symbols according to the given description (will return markets with that
-         contain the given market, case insensitive)
+         contain the given market, case-insensitive)
          regular expression) and optionally delivery and type (base/peak)"""
         df = self.get_eex_config_df(market, delivery, type_)
         return df['code'].to_list()

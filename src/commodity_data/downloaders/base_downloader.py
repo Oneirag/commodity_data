@@ -1,14 +1,13 @@
 import abc
-import logging
-import multiprocessing.pool
-import time
-
 import holidays
+import logging
 import marshmallow_dataclass
+import multiprocessing.pool
 import numpy as np
 import ong_tsdb.exceptions
 import pandas as pd
 import pyotp
+import time
 from ong_tsdb.client import OngTsdbClient
 from ong_utils import is_debugging, cookies2header, OngTimer
 
@@ -163,6 +162,7 @@ class _OngTsdbClientManager:
 class BaseDownloader(HttpGet):
     period = "1D"
     database = "commodity_data"
+    frequency = "C"  # Custom business day
 
     def __init__(self, name: str, config_name: str, class_schema, default_config_field: str,
                  roll_expirations: bool = True):
@@ -313,9 +313,17 @@ class BaseDownloader(HttpGet):
 
         def transform(value: pd.Timestamp | float) -> pd.Timestamp | float | None:
             if what == "datetime":
-                # return pd.Timestamp.fromtimestamp(value).normalize()
                 if not pd.isna(value) and value > 0:
-                    return pd.Timestamp.fromtimestamp(value).normalize()
+                    # Value is rounded for storing less values and loses precission
+                    if self.period != "1D":
+                        # Round to 5 minutes intervals
+                        base = 300
+                        value = base * round(value / base)
+                    retval = pd.Timestamp.fromtimestamp(value)
+                    if self.period == "1D":
+                        return retval.normalize()
+                    else:
+                        return retval
                 return None
             elif what == "timestamp":
                 if not pd.isna(value):  # and value > 0:
@@ -466,7 +474,7 @@ class BaseDownloader(HttpGet):
             start_date = max(start_date, self.last_data_ts.tz_localize(start_date.tz) - pd.offsets.YearBegin(10))
         self.prepare_cache(start_date, end_date, force_download)
         ecb_hols = self.get_holidays(start_date, end_date)
-        as_of_dates = pd.bdate_range(start_date, end_date, holidays=ecb_hols, freq="C")
+        as_of_dates = pd.bdate_range(start_date, end_date, holidays=ecb_hols, freq=self.frequency)
         # Chunked in months (20 Business days aprox)
         for as_of_chunk in np.array_split(as_of_dates, 20):
             if as_of_chunk.empty:

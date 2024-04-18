@@ -151,11 +151,28 @@ default_config = {
                 },
             }
             for instrument, product in [
-                ("/E.FEBY", "Y"),        # Spanish Baseload year
-                ("/E.FEBM", "M"),        # Spanish Baseload month
-                ("/E.FEBQ", "Q"),        # Spanish Baseload Quarter
-                ("/E.FE_DAILY", "D"),    # Spanish Baseload Day
+                ("/E.FEBY", "Y"),  # Spanish Baseload year
+                ("/E.FEBM", "M"),  # Spanish Baseload month
+                ("/E.FEBQ", "Q"),  # Spanish Baseload Quarter
+                ("/E.FE_DAILY", "D"),  # Spanish Baseload Day
                 ("/E.FEB_WEEK", "W"),  # Spanish Baseload Week
+            ]
+        ]
+    ],
+    "Esios": [
+        *[{
+            "commodity_cfg": {
+                "commodity": "Power", "instrument": "BL", "area": "ES",
+            },
+            "download_cfg": {
+                "indicator": 600, "column": "España",
+            }
+        }
+            for area, column in [
+                ("ES", "España"),
+                ("FR", "Francia"),
+                ("DE", "Alemania"),
+                ("PT", "Portugal"),
             ]
         ]
     ]
