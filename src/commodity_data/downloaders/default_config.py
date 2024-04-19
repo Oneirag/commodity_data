@@ -162,10 +162,10 @@ default_config = {
     "Esios": [
         *[{
             "commodity_cfg": {
-                "commodity": "Power", "instrument": "BL", "area": "ES",
+                "commodity": "Power", "instrument": "BL", "area": area,
             },
             "download_cfg": {
-                "indicator": 600, "column": "España",
+                "indicator": 600, "column": column,
             }
         }
             for area, column in [
