@@ -3,18 +3,17 @@ Class to download generic data from barchart
 """
 
 import io
-import urllib.parse
-
 import numpy as np
 import pandas as pd
+import urllib.parse
 from ong_utils import get_cookies
 
-from commodity_data.downloaders.base_downloader import HttpGet
+from commodity_data.downloaders.base_downloader import _HttpGet
 from commodity_data.downloaders.series_config import TypeColumn
 from commodity_data.globals import logger
 
 
-class BarchartData(HttpGet):
+class BarchartData(_HttpGet):
     token_cookie = "XSRF-TOKEN"
 
     def __init__(self):

@@ -1,7 +1,6 @@
-from typing import Union
-
 import pandas as pd
 from pandas import DataFrame, Series
+from typing import Union
 
 from commodity_data.downloaders.barchart.barchart_data import BarchartData
 from commodity_data.downloaders.base_downloader import BaseDownloader, TypeColumn
@@ -28,12 +27,12 @@ class BarchartDownloader(BaseDownloader):
     def min_date(self):
         return pd.Timestamp(2013, 1, 1)
 
-    def prepare_cache(self, start_date: pd.Timestamp, end_date: pd.Timestamp, force_download: bool):
+    def _prepare_cache(self, start_date: pd.Timestamp, end_date: pd.Timestamp, force_download: bool):
         cache = dict()
-        for cfg in self.iter_download_config():
+        for cfg in self._iter_download_config():
             symbol = cfg.download_cfg.symbol
             df_barchart = self.data.download(symbol, start_date=start_date, end_date=end_date)
-            df_barchart.as_of = pd.to_datetime(df_barchart.as_of)
+            df_barchart.as_of = pd.to_datetime(df_barchart.as_of).dt.tz_localize(self.local_tz)
             df_barchart = df_barchart[df_barchart.as_of >= start_date]
             df = df_barchart.loc[:, ("open", "high", "low", TypeColumn.close.value, "as_of")]  # Store OHLC
             # pivot df so OHLC are split by row
@@ -56,7 +55,7 @@ class BarchartDownloader(BaseDownloader):
 
         concat_df = pd.concat(cache.values(), axis=0)
         concat_df.rename(columns={"price": "close"}, inplace=True)
-        cache_df = self.pivot_table(concat_df, value_columns=['close', 'maturity'])
+        cache_df = self._pivot_table(concat_df, value_columns=['close', 'maturity'])
         self.cache = cache_df
 
     def _download_date(self, as_of: pd.Timestamp) -> Union[DataFrame, Series, None]:

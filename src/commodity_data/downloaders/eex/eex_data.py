@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 from pathlib import Path
 from typing import List
 
-from commodity_data.downloaders.base_downloader import HttpGet
+from commodity_data.downloaders.base_downloader import _HttpGet
 from commodity_data.downloaders.products import to_standard_delivery_month
 from commodity_data.globals import logger
 
@@ -24,7 +24,7 @@ def get_js_var(var_name: str, where: str) -> str:
     return ""
 
 
-class EEXData(HttpGet):
+class EEXData(_HttpGet):
     """Class to get market data from eex"""
 
     format_year_month_day = "%Y/%m/%d"  # Date format of other date: year/month/day

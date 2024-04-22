@@ -1,22 +1,21 @@
 import numpy as np
 import pandas as pd
-from ong_utils import OngTimer
 
 from commodity_data.downloaders import BaseDownloader
 from commodity_data.downloaders.series_config import ESiosConfig, TypeColumn
 from ong_esios.esios_api import EsiosApi
 
 
+class EsiosDownloadError(Exception):
+    """Exception raised when Esios data could not be Downloaded"""
+    pass
+
+
 class EsiosDownloader(BaseDownloader):
     # Period will be used to create database
-    period = "1H"  # Hourly
+    period = "1h"  # Hourly
     # period = "15min"      # quarter hourly
-    local_tz = "Europe/Madrid"
-    frequency = "1D"  # Data for every day
-
-    def get_holidays(self, start_date: pd.Timestamp, end_date: pd.Timestamp) -> dict:
-        """Returns no holidays"""
-        return dict()
+    frequency = "1D"  # Data for every day, not just business days
 
     def min_date(self):
         return pd.Timestamp("2015-04-01")  # First day of spot indicators
@@ -28,27 +27,29 @@ class EsiosDownloader(BaseDownloader):
             retval = retval.replace(hour=hour, minute=minute)
         return retval
 
-    def prepare_cache(self, start_date: pd.Timestamp, end_date: pd.Timestamp, force_download: bool):
+    def _prepare_cache(self, start_date: pd.Timestamp, end_date: pd.Timestamp, force_download: bool):
+        """Downloads data from cache"""
         if self.cache is None:
             self.cache = dict()
+        all_dates = pd.date_range(start_date, end_date, freq="1D")
         for config in self.download_config:
             indicator = config.download_cfg.indicator
             if indicator not in self.cache:
                 dfs = list()
-                dates = pd.date_range(start_date, end_date, freq="1D")
-                chunks = int(len(dates) / 100) + 1  # 23s
-                # chunks = int(len(dates) / 200) + 1  # 41 s
-                # chunks = int(len(dates) / 50) + 1   # 34s
-                # chunks = int(len(dates) / 150) + 1   # 36s
-                # chunks = int(len(dates) / 80) + 1   # 45s
-                with OngTimer(msg="Downloading from esios"):
-                    for as_of_chunk in np.array_split(dates, chunks):
-                        start_date = self.normalize_date(as_of_chunk[0])
-                        end_date = self.normalize_date(as_of_chunk[-1], hour=23, minute=45)
-                        self.logger.info(f"Downloading esios data {indicator=} {start_date=} {end_date=}")
-                        df = self.esios.download_by(id=indicator, date=[start_date, end_date])
+                for chunk in self._divide_chunks(all_dates, n=30):  # 30 days/1 month
+                    download_start = self.normalize_date(chunk[0])
+                    download_end = self.normalize_date(chunk[-1], hour=23, minute=45)
+                    self.logger.info(f"Downloading esios data {indicator=} {download_start=} {download_end=}")
+                    df = self.esios.download_by(id=indicator, date=[download_start, download_end])
+                    # df = dict()
+                    if df is None:
+                        # There was an error in the download...retry unless we are trying a single day
+                        raise EsiosDownloadError(f"Could not download data for {indicator=} {download_start=} "
+                                                 f"{download_end=}")
+                    else:
                         dfs.append(df)
-                self.cache[indicator] = pd.concat(dfs, axis=0)
+                if dfs:
+                    self.cache[indicator] = pd.concat(dfs, axis=0)
         pass
 
     def _download_date(self, as_of: pd.Timestamp) -> pd.DataFrame:
@@ -71,9 +72,9 @@ class EsiosDownloader(BaseDownloader):
             # Convert maturities to timestamps
             table[maturity] = table[maturity].apply(lambda x: x.timestamp())
             table = table.rename_axis("as_of").reset_index()
-            pivoted = self.pivot_table(table, value_columns=[close, maturity])
+            pivoted = self._pivot_table(table, value_columns=[close, maturity])
             tables.append(pivoted)
-        return pd.concat(tables, axis=0)
+        return pd.concat(tables, axis=1)
 
     def __init__(self, roll_expirations: bool = False):
         """Never roll expirations"""
@@ -82,10 +83,50 @@ class EsiosDownloader(BaseDownloader):
                          roll_expirations=False)
         self.esios = EsiosApi()
 
+    @property
+    def settlement_df_raw(self):
+        retval = super().settlement_df
+        # make sure that dates are in the correct time zone
+        if not retval.index.tz:
+            pass
+        return retval
+
+    @property
+    def settlement_df(self):
+        """Returns settlement grouped daily"""
+        df = self.settlement_df_raw
+
+        def grouper(val):
+            """Return mean for values thare"""
+            level_type = val.name[-1]
+            if level_type == TypeColumn.maturity:
+                return val[0]
+            elif level_type in (TypeColumn.close, TypeColumn.adj_close):
+                return np.mean(val)
+            else:
+                self.logger.warning(f"Unknown column type: {level_type}. Returning sum of values")
+                return np.sum(val)
+
+        if df.empty:
+            return df
+        retval = df.resample("1D", group_keys=True).apply(grouper)
+        return retval
+
 
 if __name__ == '__main__':
     esios = EsiosDownloader()
+    print(esios.settlement_df)
+    # esios.prepare_cache(pd.Timestamp.today().normalize(), pd.Timestamp.today().normalize(), force_download=True)
+    # esios.prepare_cache(esios.min_date(), pd.Timestamp.today().normalize(), force_download=True)
     esios.delete_all_data()
+    # esios.download()
     # esios.download(end_date=pd.Timestamp("2015-08-01"))
     esios.download(start_date=pd.Timestamp("2024-04-01"))
     print(esios.settlement_df)
+    esios.load()
+    print(esios.settlement_df)
+    from matplotlib import pyplot as plt
+
+    df = esios.settle_xs(area="ES")
+    df.plot()
+    plt.show()

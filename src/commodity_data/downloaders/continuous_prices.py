@@ -70,7 +70,7 @@ def calculate_continuous_prices(settlement_df: pd.DataFrame, valid_products: lis
         if group_close.empty:
             logger.info(f"Skipping {index[:-1]}: no data available")
             continue
-        group_maturity = group.xs(TypeColumn.maturity, level="type", axis=1, drop_level=False).astype("datetime64[ns]")
+        group_maturity = group.xs(TypeColumn.maturity, level="type", axis=1, drop_level=False)
         # Take offsets from the last row of available data
         max_offset = group_close.iloc[-1,
         np.argwhere(~group_close.iloc[-1].isna()).flatten()  # not null columns

@@ -4,13 +4,14 @@ Includes tests for data consistency
 """
 import unittest
 
-from commodity_data.cdty_data import CommodityData
+from commodity_data.cdty_data import CommodityData, BaseDownloader
 
 
 class TestCommodityData(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.cdty = CommodityData()
+        cls.cdty.download(BaseDownloader.previous_days_local(3))
         cls.cdty.load()  # loads all market data
 
     def test_not_nat_maturities(self):

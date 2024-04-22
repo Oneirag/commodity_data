@@ -1,6 +1,5 @@
-from datetime import date
-
 import pandas as pd
+from datetime import date
 
 from commodity_data.downloaders.base_downloader import BaseDownloader
 from commodity_data.downloaders.eex.eex_data import EEXData
@@ -36,7 +35,7 @@ class EEXDownloader(BaseDownloader):
 
     def _download_date(self, as_of: pd.Timestamp) -> pd.DataFrame:
         all_tables = list()
-        for cfg in self.iter_download_config():
+        for cfg in self._iter_download_config():
             download_cfg = cfg.download_cfg
             table = self.eex.download_symbol_chain_table(symbol=download_cfg.instrument, date=as_of)
             if table.empty:
@@ -64,16 +63,16 @@ class EEXDownloader(BaseDownloader):
             return pd.DataFrame()
         df_retval = pd.concat(all_tables)
         df_retval['as_of'] = as_of
-        df_retval = self.pivot_table(df_retval, value_columns=['close', 'maturity'])
+        df_retval = self._pivot_table(df_retval, value_columns=['close', 'maturity'])
         return df_retval
 
     def min_date(self):
         min_date = min(self.eex.get_min_date(cfg.download_cfg.instrument) for cfg in self.download_config)
         return min_date
 
-    def get_holidays(self, start_date: pd.Timestamp, end_date: pd.Timestamp) -> dict:
+    def _get_holidays(self, start_date: pd.Timestamp, end_date: pd.Timestamp) -> dict:
         """Add custom holidays for EEX: dec24th and dec31st"""
-        parent_holidays = super().get_holidays(start_date, end_date)
+        parent_holidays = super()._get_holidays(start_date, end_date)
         # Append dec31st and dec24th
         for year in range(start_date.year, end_date.year + 1):
             parent_holidays[date(year, 12, 24)] = "Christmas Day"

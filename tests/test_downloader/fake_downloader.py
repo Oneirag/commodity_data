@@ -1,9 +1,8 @@
 """
 Test downloader: creates a fake downloader for testing
 """
-from dataclasses import dataclass
-
 import pandas as pd
+from dataclasses import dataclass
 
 from commodity_data.downloaders.base_downloader import BaseDownloader
 from commodity_data.downloaders.series_config import CommodityCfg, _BaseDownloadConfig
@@ -29,7 +28,7 @@ class FakeDownloader(BaseDownloader):
 
     def min_date(self):
         data_days = 3
-        retval = pd.Timestamp.today().normalize() - pd.offsets.BDay(data_days)
+        retval = self.today_local() - pd.offsets.BDay(data_days)
         return retval
 
     def generate_fake_data(self, as_of: pd.Timestamp, add_spot: bool = True, add_day_ahead: bool = True,
@@ -47,7 +46,7 @@ class FakeDownloader(BaseDownloader):
             data.append(dict(maturity=as_of + pd.offsets.MonthBegin(1), offset=1, close=30 + price_offset,
                              product="M", as_of=as_of, **cfg))
         df = pd.DataFrame.from_records(data)
-        retval = self.pivot_table(df, value_columns=["close", "maturity"])
+        retval = self._pivot_table(df, value_columns=["close", "maturity"])
 
         return retval
 
@@ -63,7 +62,7 @@ class FakeDownloader(BaseDownloader):
         super().__init__("fake", None, None, None,
                          roll_expirations=roll_expirations)
 
-    def create_config(self, config_field: str, class_schema, default_config_field: str):
+    def _create_config(self, config_field: str, class_schema, default_config_field: str):
         cfg = FakeConfig(commodity_cfg=CommodityCfg(commodity="fake_commodity", instrument="fake_instrument",
                                                     area="fake_area"),
                          download_cfg=_FakeDownloadConfig(id="fake_id"))
