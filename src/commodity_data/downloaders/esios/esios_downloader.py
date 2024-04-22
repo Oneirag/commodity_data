@@ -22,7 +22,7 @@ class EsiosDownloader(BaseDownloader):
 
     def normalize_date(self, date: pd.Timestamp, hour: int = 0, minute: int = 0) -> pd.Timestamp:
         """Returns date with the correct timezone and normalized. Optionally, with the given hour and minute"""
-        retval = date.tz_localize(self.local_tz).normalize()
+        retval = self.as_local_date(date).normalize()
         if hour or minute:
             retval = retval.replace(hour=hour, minute=minute)
         return retval
@@ -86,9 +86,6 @@ class EsiosDownloader(BaseDownloader):
     @property
     def settlement_df_raw(self):
         retval = super().settlement_df
-        # make sure that dates are in the correct time zone
-        if not retval.index.tz:
-            pass
         return retval
 
     @property
@@ -97,10 +94,10 @@ class EsiosDownloader(BaseDownloader):
         df = self.settlement_df_raw
 
         def grouper(val):
-            """Return mean for values thare"""
+            """Return mean for values that are different to maturity"""
             level_type = val.name[-1]
             if level_type == TypeColumn.maturity:
-                return val[0]
+                return val.iloc[0]
             elif level_type in (TypeColumn.close, TypeColumn.adj_close):
                 return np.mean(val)
             else:
@@ -121,7 +118,7 @@ if __name__ == '__main__':
     esios.delete_all_data()
     # esios.download()
     # esios.download(end_date=pd.Timestamp("2015-08-01"))
-    esios.download(start_date=pd.Timestamp("2024-04-01"))
+    esios.download(start_date=pd.Timestamp("2023-01-01", tz=esios.local_tz))
     print(esios.settlement_df)
     esios.load()
     print(esios.settlement_df)

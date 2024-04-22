@@ -25,8 +25,10 @@ def _update_dataframe(old_df: pd.DataFrame, new_data: pd.DataFrame) -> pd.DataFr
     if old_df is not None and not old_df.empty:
         # old_df.update(new_data)
         # old_df.loc[new_data.index, new_data.columns] = new_data
-        if new_data.index.tz != old_df.index.tz:
+        if not new_data.index.tz:
             new_data.index = new_data.index.tz_localize(old_df.index.tz)
+        elif new_data.index.tz != old_df.index.tz:
+            new_data.index = new_data.index.tz_convert(old_df.index.tz)
         retval = old_df.combine_first(new_data)
         retval.sort_index(inplace=True)
         return retval
@@ -339,7 +341,7 @@ class BaseDownloader(_HttpGet):
     def __maturity_to(self, what: str, df: pd.DataFrame = None) -> pd.DataFrame:
         """Converts inplace maturity values to timestamp (what='timestamp') or to datetime (what='datetime')"""
         is_settle = df is None
-        df = self.settlement_df if is_settle else df
+        df = self.__settlement_df if is_settle else df
         if df.empty:
             return df
         index_maturity = df.columns.get_level_values('type') == 'maturity'
@@ -517,7 +519,7 @@ class BaseDownloader(_HttpGet):
         :return: the number of downloaded days
         """
         start_date = self.as_local_date(start_date)
-        end_date = self.as_local_date(start_date)
+        end_date = self.as_local_date(end_date)
         self.set_force_download_filter(force_download)
         retval = 0
         start_date = pd.Timestamp(start_date or self.as_local_date(self.min_date()))
@@ -604,7 +606,7 @@ class BaseDownloader(_HttpGet):
             self.__settlement_df = pd.DataFrame(columns=pd.MultiIndex.from_arrays([[]] * len(df_index_columns),
                                                                                   names=df_index_columns))
         else:
-            read_data = self._db_client_write.read(self.database, self.name(), self.min_date())
+            read_data = self._db_client_write.read(self.database, self.name(), self.as_local_date(self.min_date()))
             # convert to float64. Needs to be firstly converted to str to avoid losing precision
             # index is read in utc. Convert to local tz if needed
             if not read_data.index.tz:
