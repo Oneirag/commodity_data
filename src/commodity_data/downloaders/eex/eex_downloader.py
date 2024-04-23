@@ -1,5 +1,6 @@
-import pandas as pd
 from datetime import date
+
+import pandas as pd
 
 from commodity_data.downloaders.base_downloader import BaseDownloader
 from commodity_data.downloaders.eex.eex_data import EEXData
@@ -68,7 +69,7 @@ class EEXDownloader(BaseDownloader):
 
     def min_date(self):
         min_date = min(self.eex.get_min_date(cfg.download_cfg.instrument) for cfg in self.download_config)
-        return min_date
+        return min_date.tz_localize(tz=self.local_tz)
 
     def _get_holidays(self, start_date: pd.Timestamp, end_date: pd.Timestamp) -> dict:
         """Add custom holidays for EEX: dec24th and dec31st"""

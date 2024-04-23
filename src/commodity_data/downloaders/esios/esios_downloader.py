@@ -1,9 +1,9 @@
 import numpy as np
 import pandas as pd
+from ong_esios.esios_api import EsiosApi
 
 from commodity_data.downloaders import BaseDownloader
 from commodity_data.downloaders.series_config import ESiosConfig, TypeColumn
-from ong_esios.esios_api import EsiosApi
 
 
 class EsiosDownloadError(Exception):
@@ -18,7 +18,7 @@ class EsiosDownloader(BaseDownloader):
     frequency = "1D"  # Data for every day, not just business days
 
     def min_date(self):
-        return pd.Timestamp("2015-04-01")  # First day of spot indicators
+        return pd.Timestamp("2015-04-01", tz=self.local_tz)  # First day of spot indicators
 
     def normalize_date(self, date: pd.Timestamp, hour: int = 0, minute: int = 0) -> pd.Timestamp:
         """Returns date with the correct timezone and normalized. Optionally, with the given hour and minute"""
@@ -116,7 +116,7 @@ if __name__ == '__main__':
     # esios.prepare_cache(pd.Timestamp.today().normalize(), pd.Timestamp.today().normalize(), force_download=True)
     # esios.prepare_cache(esios.min_date(), pd.Timestamp.today().normalize(), force_download=True)
     esios.delete_all_data()
-    # esios.download()
+    esios.download()
     # esios.download(end_date=pd.Timestamp("2015-08-01"))
     esios.download(start_date=pd.Timestamp("2023-01-01", tz=esios.local_tz))
     print(esios.settlement_df)

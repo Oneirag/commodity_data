@@ -24,7 +24,7 @@ class OmipDownloader(BaseDownloader):
         self.omip = OmipData()
 
     def min_date(self):
-        return self.__min_date
+        return self.__min_date.tz_localize(self.local_tz)
 
     def _download_date(self, as_of: pd.Timestamp) -> pd.DataFrame:
         dfs = list()

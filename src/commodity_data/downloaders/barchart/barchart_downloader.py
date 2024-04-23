@@ -1,6 +1,7 @@
+from typing import Union
+
 import pandas as pd
 from pandas import DataFrame, Series
-from typing import Union
 
 from commodity_data.downloaders.barchart.barchart_data import BarchartData
 from commodity_data.downloaders.base_downloader import BaseDownloader, TypeColumn
@@ -25,7 +26,7 @@ class BarchartDownloader(BaseDownloader):
         self.data = BarchartData()
 
     def min_date(self):
-        return pd.Timestamp(2013, 1, 1)
+        return pd.Timestamp(2013, 1, 1, tz=self.local_tz)
 
     def _prepare_cache(self, start_date: pd.Timestamp, end_date: pd.Timestamp, force_download: bool):
         cache = dict()
