@@ -2,8 +2,15 @@
 Tells how to delete data from database. This should not be done, so it is very manual, it is not included in the
 main downloader
 """
+from commodity_data import CommodityData
 
 from commodity_data.downloaders import OmipDownloader
+
+# Delete all markets in CommodityData (asking confirmation)
+cdty = CommodityData()
+cdty.delete_data()
+
+pass
 
 omip = OmipDownloader(roll_expirations=False)
 

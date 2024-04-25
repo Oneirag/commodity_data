@@ -84,8 +84,9 @@ def calculate_continuous_prices(settlement_df: pd.DataFrame, valid_products: lis
             df_prod_0 = group_close.xs(offset, level="offset", axis=1, drop_level=False)
             df_prod_1 = group_close.xs(offset + 1, level="offset", axis=1, drop_level=False)
             # use change in product maturities to calculate expirations
-            expirations = np.argwhere(group_maturity.xs(offset, level="offset", axis=1).iloc[:, 0].astype(
-                "datetime64[ns]").bfill().diff().dt.days > 0).flatten()
+            expirations = np.argwhere(group_maturity.xs(offset, level="offset", axis=1).iloc[:, 0]
+                                      .infer_objects(copy=False)
+                                      .bfill().diff().dt.days > 0).flatten()
             # df_prod_1 should not have nans, so fill them
             roll_values = roll(df_prod_0.values.flatten(), df_prod_1.ffill().values.flatten(), expirations, roll_offset)
             df_roll = pd.Series(roll_values.flatten(), index=df_prod_0.index,

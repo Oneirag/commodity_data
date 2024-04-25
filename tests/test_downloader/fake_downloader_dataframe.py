@@ -13,7 +13,7 @@ class FakeDownloaderDataFrame(FakeDownloader):
         """
         if not df.empty:
             assert list(df.columns) == ['close'], f"Expected a dataframe just with 'close' as column"
-        if not df.index.tz:
+        if not df.empty and not df.index.tz:
             raise ValueError("Indexes has no time zone")
         self.product = product.upper()
         if self.product in "YMQDW":

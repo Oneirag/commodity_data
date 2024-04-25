@@ -88,7 +88,7 @@ class TestDownloader(TestCase):
             print(f"Test case {idx} OK")
 
     def test_roll_expiration_omip(self):
-        """Tests that adj_close values in Omip are valid, e.g have no too many nans"""
+        """Tests that adj_close values in Omip are valid, e.g. have no too many nans"""
         market = "Omip"
         if not self.downloader.get_last_ts(markets=market):
             self.downloader.download(markets=market)
@@ -122,7 +122,7 @@ class TestDownloader(TestCase):
         max_date = max_date or dates[-1]
         if min_date is None:
             # If no min date, it will be 5 years ago
-            min_date = max(dates[0], pd.Timestamp.today().normalize() - pd.offsets.YearBegin(5))
+            min_date = max(dates[0], CommodityData.today_local() - pd.offsets.YearBegin(5))
         dates = df_offset[min_date:max_date].index
         prc_offset_1 = df_offset[min_date:max_date].values[:, 0]
         prc_offset_2 = df_offset[min_date:max_date].values[:, 1]
@@ -191,7 +191,7 @@ class TestDownloader(TestCase):
 
     def test_roll_expiration(self):
         """Check expiration of Cal+1, and Q+1 and M+1 of power and gas in Omip and EEX"""
-        min_date = pd.Timestamp("2020-01-01")
+        min_date = CommodityData.as_local_date(pd.Timestamp("2020-01-01"))
         # min_date = pd.Timestamp("2024-01-01")
         # This test Does not work with M:
         # It uses NaNs to detect end of month, but M+1 product might not have NaNs before end of delivery

@@ -1,14 +1,15 @@
 import abc
-import holidays
 import logging
-import marshmallow_dataclass
 import multiprocessing.pool
+import time
+
+import holidays
+import marshmallow_dataclass
 import numpy as np
 import ong_tsdb.exceptions
 import pandas as pd
 import pandas.core.dtypes.dtypes
 import pyotp
-import time
 from ong_tsdb.client import OngTsdbClient
 from ong_utils import is_debugging, cookies2header, OngTimer
 
@@ -320,9 +321,7 @@ class BaseDownloader(_HttpGet):
         if what == "timestamp":
             return isinstance(dtype, np.dtypes.Float64DType)
         elif what == "datetime":
-            if isinstance(dtype, np.dtypes.Float64DType):
-                return False
-            elif isinstance(dtype, pandas.core.dtypes.dtypes.DatetimeTZDtype):
+            if isinstance(dtype, pandas.core.dtypes.dtypes.DatetimeTZDtype):
                 # return True
                 return dtype.tz.zone == cls.local_tz
             else:
@@ -518,12 +517,10 @@ class BaseDownloader(_HttpGet):
         only download baseload products
         :return: the number of downloaded days
         """
-        start_date = self.as_local_date(start_date)
-        end_date = self.as_local_date(end_date)
+        start_date = self.as_local_date(start_date) or self.as_local_date(self.min_date())
+        end_date = self.as_local_date(end_date) or self.today_local()
         self.set_force_download_filter(force_download)
         retval = 0
-        start_date = pd.Timestamp(start_date or self.as_local_date(self.min_date()))
-        end_date = pd.Timestamp(end_date or self.today_local())
         # If there is data already stored, unless force_download avoid downloading data older than 10 years
         if self.date_last_data_ts() and not force_download:
             start_date = max(start_date, self.last_data_ts,
@@ -545,8 +542,9 @@ class BaseDownloader(_HttpGet):
                 retval += len(dfs)
                 # Persist Data to hdfs. This is the not-thread-safe part
                 new_data = self.maturity2datetime(pd.concat(dfs))
-                self.__settlement_df = _update_dataframe(self.__settlement_df, new_data)
-                self._dump(new_data)
+                if not new_data.empty:
+                    self.__settlement_df = _update_dataframe(self.__settlement_df, new_data)
+                    self._dump(new_data)
         if retval and self.__roll_expirations:
             self.logger.info(f"Adjusting expirations for {self.__class__.__name__} {self.name()}")
             self.roll_expiration()
@@ -664,10 +662,12 @@ class BaseDownloader(_HttpGet):
             return as_of.strftime(self.date_format)
 
     @classmethod
-    def as_local_date(cls, date: pd.Timestamp | None) -> pd.Timestamp | None:
+    def as_local_date(cls, date: pd.Timestamp | None | str) -> pd.Timestamp | None:
         """If date is naive, localizes it to a local tz. If receives None returns None"""
         if not date:
             return date
+        if isinstance(date, str):
+            return pd.Timestamp(date, tz=cls.local_tz)
         if not date.tz:
             return date.tz_localize("utc").tz_convert(cls.local_tz)
         elif date.tz != cls.local_tz:

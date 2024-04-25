@@ -1,6 +1,6 @@
 import pandas as pd
 
-from commodity_data.downloaders import EEXDownloader, OmipDownloader, BarchartDownloader
+from commodity_data.downloaders import (EEXDownloader, OmipDownloader, BarchartDownloader, EsiosDownloader)
 from commodity_data.downloaders.base_downloader import BaseDownloader, FilterKeyNotFoundException
 from commodity_data.globals import logger
 
@@ -11,16 +11,22 @@ class CommodityData:
     Currently reads data from EEX, Omip and Barchart
     """
 
+    # Get static class methods related to dates from BaseDownloader
+    local_tz = BaseDownloader.local_tz
+    as_local_date = BaseDownloader.as_local_date
+    today_local = BaseDownloader.today_local
+    previous_days_local = BaseDownloader.previous_days_local
+
     def __init__(self, roll_expirations: bool = True):
-        dls = [a(roll_expirations) for a in (EEXDownloader, OmipDownloader, BarchartDownloader)]
+        dls = [a(roll_expirations) for a in (EEXDownloader, OmipDownloader, BarchartDownloader, EsiosDownloader)]
         self.__downloaders = {dl.name(): dl for dl in dls}
         self.logger = logger
 
     def settlement_df(self, markets: str | list) -> pd.DataFrame:
         """Return a raw settlement_df of all markets"""
         list_df = list()
-        for mkt in self.downloaders(markets=markets):
-            list_df.append(mkt.settlement_df)
+        for mkt, downloader in self.downloaders(markets=markets):
+            list_df.append(downloader.settlement_df)
         return pd.concat(list_df)
 
     def downloaders(self, markets: list = None) -> tuple[str, BaseDownloader]:
@@ -30,10 +36,10 @@ class CommodityData:
             if markets in market_filter or markets == market_filter:
                 yield markets, downloader
 
-    def delete_data(self, ask_confirmation: bool = True):
+    def delete_data(self, ask_confirmation: bool = True, markets: list = None):
         """Deletes data for the given downloaders (defaults to all of them)"""
-        for market, downloader in self.downloaders():
-            downloader.delete_all_data(ask_confirmation)
+        for market, downloader in self.downloaders(markets=markets):
+            downloader.delete_all_data(not ask_confirmation)
 
     def download_all_yesterday(self):
         """Updates all downloaders until yesterday"""

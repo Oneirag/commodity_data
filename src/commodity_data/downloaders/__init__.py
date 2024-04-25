@@ -1,4 +1,5 @@
-from commodity_data.downloaders.omip.omip_downloader import OmipDownloader
 from commodity_data.downloaders.barchart.barchart_downloader import BarchartDownloader
-from commodity_data.downloaders.eex.eex_downloader import EEXDownloader
 from commodity_data.downloaders.base_downloader import BaseDownloader
+from commodity_data.downloaders.eex.eex_downloader import EEXDownloader
+from commodity_data.downloaders.esios.esios_downloader import EsiosDownloader
+from commodity_data.downloaders.omip.omip_downloader import OmipDownloader
