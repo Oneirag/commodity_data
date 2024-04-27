@@ -14,6 +14,25 @@ class TestCommodityData(unittest.TestCase):
         cls.cdty.download(BaseDownloader.previous_days_local(3))
         cls.cdty.load()  # loads all market data
 
+    def test_invalid_markets(self):
+        """Tests that exceptions are risen on invalid markets, and not risen in valid ones"""
+        valid_markets = self.cdty.markets
+        invalid_markets = "ABC"
+        for test_value in [None, valid_markets, [valid_markets[-2]], valid_markets[-2:]]:
+            with self.subTest(valid=True, test_value=test_value):
+                res = list(self.cdty.downloaders(test_value))
+                if test_value is None:
+                    self.assertEqual(len(res), len(valid_markets), "values wrongly filtered")
+                else:
+                    self.assertEqual(len(res), len(test_value), "values wrongly filtered")
+        for test_value in [invalid_markets, list(invalid_markets), list(invalid_markets) + valid_markets,
+                           list(invalid_markets[-1]) + valid_markets[:-2]]:
+            with self.subTest(valid=False, test_value=test_value):
+                with self.assertRaises(ValueError):
+                    list(self.cdty.downloaders(test_value))
+
+
+
     def test_not_nat_maturities(self):
         """Tests that there are no Nat Maturities if prices are different from zero
         (meaning that each valid price has its maturity)"""

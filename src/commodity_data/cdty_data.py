@@ -29,12 +29,23 @@ class CommodityData:
             list_df.append(downloader.settlement_df)
         return pd.concat(list_df)
 
-    def downloaders(self, markets: list = None) -> tuple[str, BaseDownloader]:
-        """Gets an iterator of name, downloaders. Optionally: filter by given markets"""
-        market_filter = markets or self.__downloaders.keys()
-        for markets, downloader in self.__downloaders.items():
-            if markets in market_filter or markets == market_filter:
-                yield markets, downloader
+    @property
+    def markets(self) -> list:
+        """Gets a list of valid downloader names (markets used in filters)"""
+        return list(self.__downloaders.keys())
+
+    def downloaders(self, markets: list | str = None) -> tuple[str, BaseDownloader]:
+        """Gets an iterator of name, downloaders. Optionally: filter by given markets.
+        Raises ValueError if filter is invalid"""
+        if isinstance(markets, str):
+            markets = [markets]
+        market_filter = markets or self.markets
+        if not set(market_filter).issubset(set(self.markets)):
+            raise ValueError(f"{markets} filter is invalid. "
+                             f"Valid filter must contain values among {','.join(self.markets)}")
+        for downloader_name, downloader in self.__downloaders.items():
+            if downloader_name in market_filter:
+                yield downloader_name, downloader
 
     def delete_data(self, ask_confirmation: bool = True, markets: list = None):
         """Deletes data for the given downloaders (defaults to all of them)"""
