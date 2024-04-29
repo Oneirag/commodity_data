@@ -1,22 +1,21 @@
 import abc
-import logging
-import multiprocessing.pool
-import time
-
 import holidays
+import logging
 import marshmallow_dataclass
+import multiprocessing.pool
 import numpy as np
-import ong_tsdb.exceptions
 import pandas as pd
 import pandas.core.dtypes.dtypes
 import pyotp
-from ong_tsdb.client import OngTsdbClient
+import time
 from ong_utils import is_debugging, cookies2header, OngTimer
 
+import ong_tsdb.exceptions
 from commodity_data.downloaders.continuous_prices import calculate_continuous_prices
 from commodity_data.downloaders.default_config import default_config
 from commodity_data.downloaders.series_config import df_index_columns, TypeColumn
 from commodity_data.globals import config, logger, http, get_password
+from ong_tsdb.client import OngTsdbClient
 
 pd.options.mode.chained_assignment = 'raise'  # Raises SettingWithCopyWarning error instead of just warning
 
@@ -144,7 +143,8 @@ class _OngTsdbClientManager:
     def __create_admin_client(cls, name: str):
         if cls.__client is None:
             cls.__client = OngTsdbClient(cls.__server_url, cls.__admin_token, retry_connect=1,
-                                         retry_total=1, proxy_auth_body=cls.proxy_auth_dict(name))
+                                         retry_total=1, proxy_auth_body=cls.proxy_auth_dict(name),
+                                         validate_server_version=config("validate_server_version", True))
 
     @property
     def admin_client(self) -> OngTsdbClient:

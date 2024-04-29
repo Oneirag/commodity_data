@@ -15,7 +15,7 @@ class EsiosDownloader(BaseDownloader):
     # Period will be used to create database
     period = "1h"  # Hourly
     # period = "15min"      # quarter hourly
-    frequency = "1D"  # Data for every day, not just business days
+    frequency = "1d"  # Data for every day, not just business days
 
     def min_date(self):
         return pd.Timestamp("2015-04-01", tz=self.local_tz)  # First day of spot indicators
@@ -31,7 +31,7 @@ class EsiosDownloader(BaseDownloader):
         """Downloads data from cache"""
         if self.cache is None:
             self.cache = dict()
-        all_dates = pd.date_range(start_date, end_date, freq="1D")
+        all_dates = pd.date_range(start_date, end_date, freq=self.frequency)
         for config in self.download_config:
             indicator = config.download_cfg.indicator
             if indicator not in self.cache:
@@ -106,7 +106,7 @@ class EsiosDownloader(BaseDownloader):
 
         if df.empty:
             return df
-        retval = df.resample("1D", group_keys=True).apply(grouper)
+        retval = df.resample(self.frequency, group_keys=True).apply(grouper)
         return retval
 
 

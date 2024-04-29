@@ -23,10 +23,9 @@ class TestFakeDownloader(unittest.TestCase):
         cls.test_dfs = {
             "H": pd.DataFrame(cls.test_df_data,
                               index=pd.date_range(yesterday, freq="1h", periods=periods), columns=["close"]),
-            # TODO: Fails for QH
-            # "QH": pd.DataFrame(cls.test_df_data,
-            #                    index=pd.date_range(yesterday, freq="15min", periods=periods),
-            #                    columns=["close"]),
+            "QH": pd.DataFrame(cls.test_df_data,
+                               index=pd.date_range(yesterday, freq="15min", periods=periods),
+                               columns=["close"]),
             "D": pd.DataFrame(cls.test_df_data, index=pd.date_range(yesterday - pd.offsets.Day(periods), freq="1D",
                                                                     periods=periods),
                               columns=["close"]),
@@ -38,6 +37,8 @@ class TestFakeDownloader(unittest.TestCase):
 
         for product, df in self.test_dfs.items():
             with self.subTest(product=product):
+                # if product != "QH":
+                #     self.skipTest("No QH")
                 self.downloader_fake_df = FakeDownloaderDataFrame(df, product)
                 self.downloader_fake_df.download()
                 uploaded_df = self.downloader_fake_df.maturity2timestamp(self.downloader_fake_df.settlement_df)
