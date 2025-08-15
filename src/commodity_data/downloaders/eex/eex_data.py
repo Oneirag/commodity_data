@@ -109,7 +109,7 @@ class EEXData(HttpGet):
                 snippet = soup.find(id=f"snippet-{snippet_id}")
                 fields = snippet.find_all("field")
                 column_mapping = {field['name']: field['description'] for field in fields}
-                script = snippet.find("script")
+                script = snippet.find("script") or snippet.find_next("script")
                 all_symbols = set(re.findall("(\w*)Symbols_", script.text))
                 deliveries = get_js_var("buttons", script.text)
                 for symbol in all_symbols:

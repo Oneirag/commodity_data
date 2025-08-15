@@ -7,8 +7,9 @@ from commodity_data.downloaders.base_downloader import BaseDownloader, FilterKey
 
 class CommodityDownloader:
 
-    def __init__(self, roll_expirations: bool = True):
-        dls = [a(roll_expirations) for a in (EEXDownloader, OmipDownloader, BarchartDownloader)]
+    def __init__(self, roll_expirations: bool = True, 
+                 downloaders=(EEXDownloader, OmipDownloader, BarchartDownloader)):
+        dls = [a(roll_expirations) for a in downloaders]
         self.__downloaders = {dl.name(): dl for dl in dls}
         self.logger = logger
 
@@ -69,10 +70,9 @@ class CommodityDownloader:
 
 
 if __name__ == '__main__':
-    downloader = CommodityDownloader(roll_expirations=False)
     print(downloader.get_last_ts())
-    # downloader.download_all_yesterday()
-    downloader.roll_expiration("EEX")
+    downloader.download_all_yesterday()
+    # downloader.roll_expiration("EEX")
     exit(0)
 
     # downloader.load()
