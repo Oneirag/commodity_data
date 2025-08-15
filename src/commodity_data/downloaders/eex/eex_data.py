@@ -6,6 +6,8 @@ import re
 from pathlib import Path
 from typing import List
 
+import pandas as pd
+
 from commodity_data.downloaders.base_downloader import _HttpGet
 from commodity_data.downloaders.products import to_standard_delivery_month
 from commodity_data.globals import logger
@@ -240,7 +242,7 @@ class EEXData(_HttpGet):
                 df[c] = pd.to_datetime(df[c], format=self.format_month_day_year)
         return df
 
-    def get_eex_config_df(self, market: str = None, delivery=None, type_=None) -> pandas.DataFrame:
+    def get_eex_config_df(self, market: str = None, delivery=None, type_=None) -> pd.DataFrame:
         """Gets a filtered DataFrame with market, delivery, type and code columns
          of the EEX market symbol according to the given description (will return markets with that
          contain the given market, case-insensitive)
