@@ -3,17 +3,17 @@ Class to download generic data from barchart
 """
 
 import io
-import urllib.parse
-
 import numpy as np
 import pandas as pd
+import urllib.parse
 from ong_utils import get_cookies
 
-from commodity_data import logger
-from commodity_data.downloaders.base_downloader import HttpGet, TypeColumn
+from commodity_data.downloaders.base_downloader import _HttpGet
+from commodity_data.downloaders.series_config import TypeColumn
+from commodity_data.globals import logger
 
 
-class BarchartData(HttpGet):
+class BarchartData(_HttpGet):
     token_cookie = "XSRF-TOKEN"
 
     def __init__(self):
@@ -29,7 +29,6 @@ class BarchartData(HttpGet):
             # Update cookies
             self.cookies = get_cookies(resp)
             token_header = f"x-{self.token_cookie.lower()}"
-            token_header = "x-XSRF-TOKEN".lower()
             self.headers.update({token_header: urllib.parse.unquote(self.cookies[self.token_cookie])})
 
     def download(self, symbol: str, start_date: pd.Timestamp, end_date: pd.Timestamp = None) -> pd.DataFrame:

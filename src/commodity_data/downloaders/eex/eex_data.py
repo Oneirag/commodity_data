@@ -6,17 +6,14 @@ import re
 from pathlib import Path
 from typing import List
 
-import pandas
-import pandas as pd
-from bs4 import BeautifulSoup
-
-from commodity_data import logger, to_delivery_month
-from commodity_data.downloaders.base_downloader import HttpGet
+from commodity_data.downloaders.base_downloader import _HttpGet
+from commodity_data.downloaders.products import to_standard_delivery_month
+from commodity_data.globals import logger
 
 
 def get_js_var(var_name: str, where: str) -> str:
     """Gets the string of the value of a javascript variable, like a = value"""
-    found = re.findall(f"{var_name}.*\s?=\s?(.*);", where)
+    found = re.findall(rf"{var_name}.*\s?=\s?(.*);", where)
     if found:
         first_found = found[0]
         first_found = first_found.replace(",]", "]")
@@ -24,7 +21,7 @@ def get_js_var(var_name: str, where: str) -> str:
     return ""
 
 
-class EEXData(HttpGet):
+class EEXData(_HttpGet):
     """Class to get market data from eex"""
 
     format_year_month_day = "%Y/%m/%d"  # Date format of other date: year/month/day
@@ -263,7 +260,7 @@ class EEXData(HttpGet):
 
     def get_eex_symbol(self, market: str, delivery=None, type_=None) -> List[str]:
         """Gets a list of the EEX market symbols according to the given description (will return markets with that
-         contain the given market, case insensitive)
+         contain the given market, case-insensitive)
          regular expression) and optionally delivery and type (base/peak)"""
         df = self.get_eex_config_df(market, delivery, type_)
         return df['code'].to_list()
@@ -287,7 +284,7 @@ class EEXData(HttpGet):
             return
         delivery = symbol_data['delivery'].iat[0]
         if delivery in ("Year", "Quarter", "Month", "Monat"):
-            return symbol + to_delivery_month(maturity)
+            return symbol + to_standard_delivery_month(maturity)
         else:
             return
 
@@ -316,7 +313,8 @@ if __name__ == '__main__':
     for symbol, wrong_date in [
         ("/E.FE_DAILY", "2020-11-11",),
         ("/E.FEBQ", "2020-10-09",),
-        # "2018-10-23", "2018-06-03", "2019-06-05", "2019-06-05", "2019-06-05", "2019-08-07", "2019-08-21", "2019-12-19",
+        # "2018-10-23", "2018-06-03", "2019-06-05", "2019-06-05", "2019-06-05", "2019-08-07",
+        # "2019-08-21", "2019-12-19",
         # "2020-01-31"
     ]:
         # daily_data = eex.download_symbol_chain_table(symbol=symbol['code'].values[0], date=wrong_date)

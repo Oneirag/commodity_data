@@ -1,8 +1,8 @@
 import pandas as pd
 
 from commodity_data.downloaders.base_downloader import BaseDownloader, TypeColumn
-from commodity_data.downloaders.omip.omip_data import Omip_Data
-from commodity_data.series_config import df_index_columns, OmipConfig
+from commodity_data.downloaders.omip.omip_data import OmipData
+from commodity_data.downloaders.series_config import df_index_columns, OmipConfig
 
 
 class OmipDownloader(BaseDownloader):
@@ -20,16 +20,16 @@ class OmipDownloader(BaseDownloader):
         super().__init__(name="Omip", config_name="omip_downloader", class_schema=OmipConfig,
                          default_config_field="omip_downloader_use_default", roll_expirations=roll_expirations)
         # Calculate the absolute minimum date for download
-        self.__min_date = min(pd.Timestamp(cfg.download_cfg.start_t) for cfg in self.config)
-        self.omip = Omip_Data()
+        self.__min_date = min(pd.Timestamp(cfg.download_cfg.start_t) for cfg in self.download_config)
+        self.omip = OmipData()
 
     def min_date(self):
-        return self.__min_date
+        return self.__min_date.tz_localize(self.local_tz)
 
     def _download_date(self, as_of: pd.Timestamp) -> pd.DataFrame:
         dfs = list()
         # for cdty, cdty_config in OmipConfig.commodity_config.items():
-        for cfg in self.config:
+        for cfg in self._iter_download_config():
             cdty = cfg.commodity_cfg.commodity
             self.logger.info(f"Downloading Omip as of {self.as_of_str(as_of)} for {cdty}")
             df = self.omip.download_omip_data(self.as_of_str(as_of), **cfg.download_cfg.__dict__)
@@ -41,7 +41,7 @@ class OmipDownloader(BaseDownloader):
             df['market'] = self.name()
             df['type'] = TypeColumn.close.value
             df['maturity'] = df['maturity'].apply(lambda x: x.timestamp())
-            df = self.pivot_table(df, value_columns=['close', 'maturity'])
+            df = self._pivot_table(df, value_columns=['close', 'maturity'])
             dfs.append(df)
         if dfs:
             return pd.concat(dfs, axis=1)
@@ -62,7 +62,7 @@ if __name__ == '__main__':
     omip.roll_expiration()
     omip.load()
     # print(omip.download(pd.Timestamp(2016, 1, 1)))
-    #print(omip.download())
+    # print(omip.download())
     omip.settle_xs(commodity="Power", area="ES", product="Y", offset=1).plot()
     plt.show()
 

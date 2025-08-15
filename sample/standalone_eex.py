@@ -2,11 +2,10 @@
 Example to download EEX data standalone, without writing to any database
 In the case of EEX, data has to be downloaded per day, product and delivery
 """
-from commodity_data.downloaders.eex import EEXData
-from commodity_data import to_delivery_month
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
 
+from commodity_data.downloaders.eex import EEXData
 
 if __name__ == '__main__':
 

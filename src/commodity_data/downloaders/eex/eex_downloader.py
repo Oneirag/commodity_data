@@ -4,8 +4,8 @@ import pandas as pd
 
 from commodity_data.downloaders.base_downloader import BaseDownloader
 from commodity_data.downloaders.eex.eex_data import EEXData
-from commodity_data.downloaders.offsets import date_offset
-from commodity_data.series_config import EEXConfig, df_index_columns
+from commodity_data.downloaders.products import date_offset
+from commodity_data.downloaders.series_config import EEXConfig, df_index_columns
 
 
 class EEXDownloader(BaseDownloader):
@@ -18,7 +18,9 @@ class EEXDownloader(BaseDownloader):
         """
         Product offset typically should be continuous from 1 onwards, stepping from 1 to 1
         However, it can appear a product with strange offsets, that has to be removed
-        :param df:
+        :param df: dataframe with the downloaded results
+        :param symbol: eex symbol, used for logging
+        :param date: asof date of data, used for logging
         :return:
         """
         max_offset = 4
@@ -34,7 +36,7 @@ class EEXDownloader(BaseDownloader):
 
     def _download_date(self, as_of: pd.Timestamp) -> pd.DataFrame:
         all_tables = list()
-        for cfg in self.config:
+        for cfg in self._iter_download_config():
             download_cfg = cfg.download_cfg
             table = self.eex.download_symbol_chain_table(symbol=download_cfg.instrument, date=as_of)
             if table.empty:
@@ -62,16 +64,16 @@ class EEXDownloader(BaseDownloader):
             return pd.DataFrame()
         df_retval = pd.concat(all_tables)
         df_retval['as_of'] = as_of
-        df_retval = self.pivot_table(df_retval, value_columns=['close', 'maturity'])
+        df_retval = self._pivot_table(df_retval, value_columns=['close', 'maturity'])
         return df_retval
 
     def min_date(self):
-        min_date = min(self.eex.get_min_date(cfg.download_cfg.instrument) for cfg in self.config)
-        return min_date
+        min_date = min(self.eex.get_min_date(cfg.download_cfg.instrument) for cfg in self.download_config)
+        return min_date.tz_localize(tz=self.local_tz)
 
-    def get_holidays(self, start_date: pd.Timestamp, end_date: pd.Timestamp) -> dict:
+    def _get_holidays(self, start_date: pd.Timestamp, end_date: pd.Timestamp) -> dict:
         """Add custom holidays for EEX: dec24th and dec31st"""
-        parent_holidays = super().get_holidays(start_date, end_date)
+        parent_holidays = super()._get_holidays(start_date, end_date)
         # Append dec31st and dec24th
         for year in range(start_date.year, end_date.year + 1):
             parent_holidays[date(year, 12, 24)] = "Christmas Day"
@@ -85,16 +87,22 @@ if __name__ == '__main__':
     # force_download = True
     eex = EEXDownloader(roll_expirations=False)
 
-    eex.delete_all_data()
-    eex.download()
-    exit(0)
-    eex.download(start_date=pd.Timestamp(2023, 1, 1), force_download=force_download)
+    # eex.delete_all_data()
+    # eex.download()
+    # exit(0)
+    # eex.download(start_date=pd.Timestamp(2023, 1, 1), force_download=force_download)
     # eex.download(start_date=pd.Timestamp(2024, 3, 18), force_download=True)
     # year_data = eex.settle_xs(commodity="Power", area="ES", product="Y", offset=1, type="close")
     year_data = eex.settle_xs(commodity="Power", area="ES",  # product="Y",
                               type="close",
                               maturity="2025-1-1",
                               allow_zero_prices=False)
+
+    week_data = eex.settle_xs(commodity="Power", area="ES",  # product="Y",
+                              type="close",
+                              product="W",
+                              allow_zero_prices=False)
+    print(week_data)
 
     import matplotlib.pyplot as plt
 

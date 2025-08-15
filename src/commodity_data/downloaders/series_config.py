@@ -6,14 +6,14 @@ Examples:
     Omip    Emissions   EUA         Eu              Y           ---
     Omip    Gas         Base        Es              MQY         ---
 """
+import abc
 import datetime
 from dataclasses import field
 from enum import Enum
-
 from marshmallow.validate import OneOf
 from marshmallow_dataclass import dataclass
 
-valid_product = "YMQD"
+from commodity_data.downloaders.products import valid_product
 
 df_index_columns = ["market",  # market from which data is downloaded (Omip, ICE...)
                     "commodity",  # Generic name of commodity (Power, Gas, CO2....)
@@ -28,6 +28,7 @@ df_index_columns = ["market",  # market from which data is downloaded (Omip, ICE
 class TypeColumn(str, Enum):
     close = "close"  # Original settlement price
     adj_close = "adj_close"  # Adjusted settlement price (taking into account product rolling)
+    maturity = "maturity"  # Maturity date of the products
 
 
 @dataclass
@@ -37,8 +38,31 @@ class CommodityCfg:
     area: str = ""
 
 
+class _BaseDownloadConfig:
+
+    def meets(self, filter: dict) -> bool:
+        """Returns True if this config meets the values of other config. Checks that all non empty fields are equal"""
+        check_fields = self.__dict__.keys()
+        if difference := (set(filter) - set(check_fields)):
+            raise TypeError(f"Filter contains invalid fields: {difference}")
+        return all(
+            getattr(self, field_name) == (filter.get(field_name, None) or getattr(self, field_name))
+            for field_name in check_fields
+        )
+
+
 @dataclass
-class _OmipDownloadConfig:
+class _BaseCommodityConfig:
+    commodity_cfg: CommodityCfg
+
+    @abc.abstractmethod
+    def id(self) -> str:
+        """Should return a unique str"""
+        pass
+
+
+@dataclass
+class _OmipDownloadConfig(_BaseDownloadConfig):
     instrument: str
     zone: str
     start_t: datetime.date
@@ -46,15 +70,14 @@ class _OmipDownloadConfig:
 
 
 @dataclass
-class _BarchartDownloadConfig:
+class _BarchartDownloadConfig(_BaseDownloadConfig):
     symbol: str
     product: str = field(default="D", metadata={"validate": OneOf(valid_product)})
     expiry: datetime.date = field(default=None)
 
 
 @dataclass
-class BarchartConfig:
-    commodity_cfg: CommodityCfg
+class BarchartConfig(_BaseCommodityConfig):
     download_cfg: _BarchartDownloadConfig
 
     def id(self) -> str:
@@ -66,8 +89,7 @@ class BarchartConfig:
 
 
 @dataclass
-class OmipConfig:
-    commodity_cfg: CommodityCfg
+class OmipConfig(_BaseCommodityConfig):
     download_cfg: _OmipDownloadConfig
 
     def id(self) -> str:
@@ -75,17 +97,28 @@ class OmipConfig:
 
 
 @dataclass
-class _EEXDownloadConfig:
+class _EEXDownloadConfig(_BaseDownloadConfig):
     instrument: str
-    zone: str
-    # start_t: datetime.date
     product: str
 
 
 @dataclass
-class EEXConfig:
-    commodity_cfg: CommodityCfg
+class EEXConfig(_BaseCommodityConfig):
     download_cfg: _EEXDownloadConfig
 
     def id(self) -> str:
-        return ",".join([self.download_cfg.instrument, self.download_cfg.product, self.download_cfg.zone])
+        return self.download_cfg.instrument
+
+
+@dataclass
+class _EsiosDownloadConfig(_BaseDownloadConfig):
+    indicator: int
+    column: str
+
+
+@dataclass
+class ESiosConfig(_BaseCommodityConfig):
+    download_cfg: _EsiosDownloadConfig
+
+    def id(self) -> str:
+        return f"{self.download_cfg.indicator}-{self.download_cfg.column}"

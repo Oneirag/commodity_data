@@ -3,6 +3,7 @@ This is an example of downloading barchart data to a dataframe, without using do
 database (No need to use ong_tsdb)
 """
 import pandas as pd
+
 from commodity_data.downloaders.barchart import BarchartData
 
 if __name__ == '__main__':
