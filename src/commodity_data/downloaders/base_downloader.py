@@ -427,7 +427,8 @@ class BaseDownloader(_HttpGet):
                 retval = retval.T.groupby(level=names).sum().T
             else:
                 # Remove maturity if not explicitly asked for it
-                retval = retval.loc[:, retval.columns.get_level_values('type') != 'maturity']
+                if not "maturity" in (type or []):
+                    retval = retval.loc[:, retval.columns.get_level_values('type') != 'maturity']
             if not allow_zero_prices:
                 retval[retval == 0] = None
             return retval
@@ -668,9 +669,18 @@ class BaseDownloader(_HttpGet):
             return date
         if isinstance(date, str):
             return pd.Timestamp(date, tz=cls.local_tz)
+        else:
+            date = pd.Timestamp(date)
         if not date.tz:
             return date.tz_localize("utc").tz_convert(cls.local_tz)
         elif date.tz != cls.local_tz:
             return date.tz_convert(cls.local_tz)
         else:
             return date
+
+
+if __name__ == "__main__":
+    import datetime
+    
+    print(BaseDownloader.as_local_date(datetime.datetime(2024, 12, 1)))
+    
