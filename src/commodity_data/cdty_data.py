@@ -145,7 +145,7 @@ class CommodityData:
         for mkt, downloader in self.downloaders(markets):
             data = downloader.settlement_df
             if date_from:
-                data = data[date_from:]
+                data = data[self.as_local_date(date_from):]
             dfs.append(data)
         pass
         if dfs:
