@@ -32,6 +32,10 @@ class BarchartDownloader(BaseDownloader):
         cache = dict()
         for cfg in self._iter_download_config():
             symbol = cfg.download_cfg.symbol
+            expiry = self.as_local_date(cfg.download_cfg.expiry)
+            # If product is expired for the cache dates, there is no need to download it again
+            if expiry and (expiry < start_date):
+                continue
             df_barchart = self.data.download(symbol, start_date=start_date, end_date=end_date)
             df_barchart.as_of = pd.to_datetime(df_barchart.as_of).dt.tz_localize(self.local_tz)
             df_barchart = df_barchart[df_barchart.as_of >= start_date]
@@ -52,7 +56,13 @@ class BarchartDownloader(BaseDownloader):
             else:
                 df_melt['maturity'] = df_melt.as_of.apply(lambda dt: dt.timestamp())
                 df_melt['offset'] = 0  # If no maturity, then it is supposed to be a stock or a spot value
-            cache[symbol] = df_melt
+            # Reduce a little bit the amount of data by limiting offsets to 12 months or 4 years
+            max_offset = 12 
+            if cfg.download_cfg.product == "M":
+                max_offset = 12
+            elif cfg.download_cfg.product == "Y":
+                max_offset = 4    
+            cache[symbol] = df_melt[df_melt['offset'] < max_offset]
 
         concat_df = pd.concat(cache.values(), axis=0)
         concat_df.rename(columns={"price": "close"}, inplace=True)
@@ -69,6 +79,10 @@ class BarchartDownloader(BaseDownloader):
 
 if __name__ == '__main__':
     ice = BarchartDownloader()
+    ice.delete_all_data()
+    df_res = ice.data.download("QAZ5", 
+                               start_date=ice.as_local_date("2024-01-01"), 
+                               end_date=ice.as_local_date("2025-12-01"))
     ice.download()
     ice.settle_xs(offset=1).plot()
     import matplotlib.pyplot as plt
