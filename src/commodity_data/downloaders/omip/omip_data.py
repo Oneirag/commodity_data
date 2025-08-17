@@ -1,8 +1,7 @@
+import pandas as pd
 from datetime import datetime
 
-import pandas as pd
-
-from commodity_data.downloaders.base_downloader import HttpGet
+from commodity_data.downloaders.base_downloader import _HttpGet
 from commodity_data.downloaders.products import date_offset
 from commodity_data.globals import logger
 
@@ -43,7 +42,7 @@ def parse_omip_product_maturity_offset(omip_product: str, as_of: pd.Timestamp) -
     return omip_product[0], maturity, offset
 
 
-class OmipData(HttpGet):
+class OmipData(_HttpGet):
     logger = logger
     """Class to download data directly from omip website"""
 

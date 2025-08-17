@@ -2,10 +2,12 @@
 Tests marshmallow configurations, to check they are syntactically correct
 """
 import unittest
-import marshmallow_dataclass
+
 import marshmallow
-from commodity_data.series_config import BarchartConfig, OmipConfig
+import marshmallow_dataclass
+
 from commodity_data.downloaders.default_config import default_config
+from commodity_data.downloaders.series_config import BarchartConfig, OmipConfig
 
 
 class TestMarshmallow(unittest.TestCase):

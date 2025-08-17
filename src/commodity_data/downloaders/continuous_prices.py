@@ -34,28 +34,30 @@ def column_idx(index, names=df_index_columns, **kwargs) -> tuple:
 
 
 def calculate_continuous_prices(settlement_df: pd.DataFrame, valid_products: list = None,
+                                valid_commodities: list = None, valid_areas: list = None,
                                 continuous_price_type: str = TypeColumn.adj_close.value,
                                 roll_offset: int = 0) -> pd.DataFrame:
     """
     Calculates adj_close columns for the given settlement_df (a pandas DataFrame with multiindex columns)
     :param settlement_df: a BaseDownloader.settlement_df pandas DataFrame
     :param valid_products: a list of valid products (e.g.: YMQWD) to calculate continuous_prices
+    :param valid_commodities: a list of valid commodities (e.g.: ['Power', 'Gas']) to calculate continuous_prices
+    :param valid_areas: a list of valid areas (e.g.: ['ES', 'FR']) to calculate continuous_prices
     :param continuous_price_type: value for the level "type" of the column with the continuous proces
     :param roll_offset: number of business days for performing offset
     :return: a new pandas DataFrame with the adj_close calculated for the valid
     """
-
-    # remove maturity, ignoring non-existing columns
-    # settlement_df = settlement_df.drop(TypeColumn.maturity, level="type", axis=1, errors="ignore")
-
     valid_columns = settlement_df.columns.get_level_values('offset') > 0
-    # Do not roll weeks
-    # valid_columns = valid_columns & (settlement_df.columns.get_level_values('product') != "W")
     df_rolls = list()
-    for _, group_t in settlement_df.loc[:, valid_columns].T.groupby(["market", "commodity", "area", "product"]):
+    for (market, commodity, area, product), group_t in settlement_df.loc[:, valid_columns].T.groupby(
+            ["market", "commodity", "area", "product"]):
         product = group_t.index.get_level_values("product")[0]
         index = group_t.index[0]
-        if valid_products and product not in valid_products:
+        if (
+                (valid_products and product not in valid_products) or
+                (valid_commodities and commodity not in valid_commodities) or
+                (valid_areas and area not in valid_areas)
+        ):
             logger.info(f"Skipping rolling of {index[:-1]}")
             continue
         logger.info(f"Processing rolling of {index[:-1]}")
@@ -68,7 +70,7 @@ def calculate_continuous_prices(settlement_df: pd.DataFrame, valid_products: lis
         if group_close.empty:
             logger.info(f"Skipping {index[:-1]}: no data available")
             continue
-        group_maturity = group.xs(TypeColumn.maturity, level="type", axis=1, drop_level=False).astype("datetime64[ns]")
+        group_maturity = group.xs(TypeColumn.maturity, level="type", axis=1, drop_level=False)
         # Take offsets from the last row of available data
         max_offset = group_close.iloc[-1,
         np.argwhere(~group_close.iloc[-1].isna()).flatten()  # not null columns
@@ -82,8 +84,9 @@ def calculate_continuous_prices(settlement_df: pd.DataFrame, valid_products: lis
             df_prod_0 = group_close.xs(offset, level="offset", axis=1, drop_level=False)
             df_prod_1 = group_close.xs(offset + 1, level="offset", axis=1, drop_level=False)
             # use change in product maturities to calculate expirations
-            expirations = np.argwhere(group_maturity.xs(offset, level="offset", axis=1).iloc[:, 0].astype(
-                "datetime64[ns]").bfill().diff().dt.days > 0).flatten()
+            expirations = np.argwhere(group_maturity.xs(offset, level="offset", axis=1).iloc[:, 0]
+                                      .infer_objects(copy=False)
+                                      .bfill().diff().dt.days > 0).flatten()
             # df_prod_1 should not have nans, so fill them
             roll_values = roll(df_prod_0.values.flatten(), df_prod_1.ffill().values.flatten(), expirations, roll_offset)
             df_roll = pd.Series(roll_values.flatten(), index=df_prod_0.index,
