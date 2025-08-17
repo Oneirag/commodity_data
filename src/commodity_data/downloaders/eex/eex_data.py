@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import List
 
 import pandas as pd
+from bs4 import BeautifulSoup
 
 from commodity_data.downloaders.base_downloader import _HttpGet
 from commodity_data.downloaders.products import to_standard_delivery_month
@@ -42,8 +43,15 @@ class EEXData(_HttpGet):
         cache = self.load_check_cache() if not force_download_config else dict()
         self.cache_valid = cache.get('valid', False)
         self.cache_df = cache.get('df', None)
-        self.market_config_df = self.get_market_futures_config_df()
-        self.logger.debug(self.market_config_df.to_string())
+        self.__cached_market_config_df = None
+
+    @property
+    def market_config_df(self):
+        """Cached version of the market_config, as it is not needed unless you want to download something"""
+        if not self.__cached_market_config_df:
+            self.__cached_market_config_df = self.get_market_futures_config_df()
+            self.logger.debug(self.__cached_market_config_df.to_string())
+        return self.__cached_market_config_df
 
     def js_request_results(self, url: str, params: dict, headers: dict = None) -> dict:
         self.headers = {
