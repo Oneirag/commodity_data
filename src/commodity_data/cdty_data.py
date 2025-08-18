@@ -17,8 +17,14 @@ class CommodityData:
     today_local = BaseDownloader.today_local
     previous_days_local = BaseDownloader.previous_days_local
 
-    def __init__(self, roll_expirations: bool = True):
-        dls = [a(roll_expirations) for a in (EEXDownloader, OmipDownloader, BarchartDownloader, EsiosDownloader)]
+    def __init__(self, roll_expirations: bool = True,
+                 downloaders=(EEXDownloader, OmipDownloader, BarchartDownloader, EsiosDownloader)):
+        dls = []
+        for dl in downloaders:
+            try:
+                dls.append(dl(roll_expirations))
+            except Exception as e:
+                logger.warning(f"Could not start downloader {dl.__class__.__name__} due to {e}")
         self.__downloaders = {dl.name(): dl for dl in dls}
         self.logger = logger
 
