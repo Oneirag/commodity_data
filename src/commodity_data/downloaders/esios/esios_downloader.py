@@ -1,10 +1,14 @@
 import numpy as np
 import pandas as pd
-from ong_esios.esios_api import EsiosApi
 
 from commodity_data.downloaders import BaseDownloader
 from commodity_data.downloaders.series_config import ESiosConfig, TypeColumn
+from commodity_data.globals import logger
 
+try:
+    from ong_esios.esios_api import EsiosApi
+except Exception as e:
+    logger.warning(f"Could not load EsiosApi: {e}")
 
 class EsiosDownloadError(Exception):
     """Exception raised when Esios data could not be Downloaded"""
