@@ -2,10 +2,10 @@
 Downloads all EEX & Omip data plus CO2, Brent, Henry Hub and FX, and generates an "algo_trading.csv" file
 """
 import pandas as pd
+
 from commodity_data import CommodityData
-from commodity_data.utils.contract_size import Duration, size_dfmi
 from commodity_data.utils.continous_price import roll_dfmi
-    
+from commodity_data.utils.contract_size import Duration, size_dfmi
 
 cdty = CommodityData()
 
@@ -36,8 +36,6 @@ size_dfmi(power_df_1_2, Duration.hours_month, dict(product="M"))
 df = pd.concat([co2_df_1_2, power_df_1_2, fx_df, brent_df_2_3, hh_df_2_3], axis=1).loc["2018-01-01":]
 # Perform actual rolling
 roll_dfmi(df)
-
-rolled = calculate_continuous_prices(df)
 
 df2 = pd.DataFrame(df.values, columns=["_".join(str(level) for level in c) for c in df.columns], index=df.index)
 # Rename type="close" to type="price"
