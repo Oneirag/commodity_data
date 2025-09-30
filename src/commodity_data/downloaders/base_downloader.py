@@ -460,7 +460,11 @@ class BaseDownloader(_HttpGet):
             self.logger.error(error_msg)
             raise ValueError(error_msg)
         # Use pd.pivot_table to reshape the DataFrame
-        df_pivot = pd.pivot_table(df, index='as_of', columns=levels, values=value_columns)
+        if "type" in df.columns:
+            df_close = df[df.type == "close"]       # Otherwise prices will be an average of open, high, low and close
+        else:
+            df_close = df
+        df_pivot = pd.pivot_table(df_close, index='as_of', columns=levels, values=value_columns)
         # Fix level order and names
         level_idx = list(range(len(df_index_columns)))
         # Put type the last

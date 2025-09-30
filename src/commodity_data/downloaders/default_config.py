@@ -71,7 +71,7 @@ default_config = {
         *[
             {
                 "download_cfg": {
-                    "symbol": "QA{}".format(to_standard_delivery_month(month_date)),
+                    "symbol": "CB{}".format(to_standard_delivery_month(month_date)),
                     "expiry": month_date,
                     "product": "M",
                 },

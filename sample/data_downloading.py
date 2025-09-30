@@ -17,7 +17,9 @@ cdty = CommodityData(roll_expirations=False)
 #######################
 # updating all data until yesterday (best choice if you just want to update data)
 cdty.download_all_yesterday()
+# cdty.download(markets="Barchart", start_date="2013-01-01", force_download=True)
 
+exit(1)
 # Downloading for a market in a certain date. It won't download again if data existed
 cdty.download("2024-3-1", "2024-03-15", markets="EEX")
 
