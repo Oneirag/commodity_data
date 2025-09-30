@@ -44,6 +44,9 @@ df2.columns = (c.replace("_close", "_price") for c in df2.columns)
 df2.reset_index(inplace=True)
 df2.sort_index(axis=1, inplace=True)
 
-df2.to_csv("algo_trading.csv", date_format="%Y-%m-%d", index=False)
+# Get currents date in YYYYMMDD format
+current_date = pd.Timestamp.today().strftime("%Y%m%d")
+# Save to csv with current date as prefix
+df2.to_csv(f"{current_date}_algo_trading.csv", date_format="%Y-%m-%d", index=False)
 
 pass
