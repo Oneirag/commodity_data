@@ -4,7 +4,7 @@ import pandas as pd
 
 from commodity_data.downloaders.base_downloader import HttpGet
 from commodity_data.downloaders.products import date_offset
-from commodity_data.globals import logger
+from commodity_data.globals import logger, CustomLocale
 
 
 def parse_omip_product_maturity_offset(omip_product: str, as_of: pd.Timestamp) -> tuple:
@@ -13,32 +13,33 @@ def parse_omip_product_maturity_offset(omip_product: str, as_of: pd.Timestamp) -
         Item 1: its maturity (start date of delivery) from an Omip product description
         Item 2: its offset from the start date
     If product can not be parsed returns None, None, None"""
-    if omip_product.startswith("M"):
-        date_str = omip_product[2:]
-        maturity = pd.Timestamp(datetime.strptime(date_str, "%b-%y"))
-        offset = date_offset(as_of, maturity, "M")
-    elif omip_product.startswith("D"):
-        date_str = omip_product[2:]
-        maturity = pd.Timestamp(datetime.strptime(date_str[2:], "%d%b-%y"))
-        offset = date_offset(as_of, maturity, "D")
-    elif omip_product.startswith("Y"):
-        maturity = pd.Timestamp(datetime.strptime(omip_product[3:], "%y"))
-        offset = date_offset(as_of, maturity, "Y")
-    elif omip_product.startswith("Q"):
-        # There is no standard format for quarters, so it has to be parsed manually
-        date_str = omip_product
-        quarter = int(date_str[1])
-        year = int(date_str[3:])
-        maturity = pd.Timestamp(year=(2000 + year), month=quarter * 3 - 2, day=1)
-        offset = date_offset(as_of, maturity, "Q")
-    # Parse weeks, but IGNORE gas weekdays
-    elif omip_product.startswith("Wk") and not omip_product.startswith("WkDs"):
-        date_str = omip_product
-        maturity = pd.Timestamp(datetime.strptime(date_str[2:] + '-1', "%W-%y-%w"))
-        offset = date_offset(as_of, maturity, "W")
-    else:
-        # Weekends, Seasons, PPAs, balance of month, weekdays...
-        return None, None, None
+    with CustomLocale():
+        if omip_product.startswith("M"):
+            date_str = omip_product[2:]
+            maturity = pd.Timestamp(datetime.strptime(date_str, "%b-%y"))
+            offset = date_offset(as_of, maturity, "M")
+        elif omip_product.startswith("D"):
+            date_str = omip_product[2:]
+            maturity = pd.Timestamp(datetime.strptime(date_str[2:], "%d%b-%y"))
+            offset = date_offset(as_of, maturity, "D")
+        elif omip_product.startswith("Y"):
+            maturity = pd.Timestamp(datetime.strptime(omip_product[3:], "%y"))
+            offset = date_offset(as_of, maturity, "Y")
+        elif omip_product.startswith("Q"):
+            # There is no standard format for quarters, so it has to be parsed manually
+            date_str = omip_product
+            quarter = int(date_str[1])
+            year = int(date_str[3:])
+            maturity = pd.Timestamp(year=(2000 + year), month=quarter * 3 - 2, day=1)
+            offset = date_offset(as_of, maturity, "Q")
+        # Parse weeks, but IGNORE gas weekdays
+        elif omip_product.startswith("Wk") and not omip_product.startswith("WkDs"):
+            date_str = omip_product
+            maturity = pd.Timestamp(datetime.strptime(date_str[2:] + '-1', "%W-%y-%w"))
+            offset = date_offset(as_of, maturity, "W")
+        else:
+            # Weekends, Seasons, PPAs, balance of month, weekdays...
+            return None, None, None
 
     return omip_product[0], maturity, offset
 

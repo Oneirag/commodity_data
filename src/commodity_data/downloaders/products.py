@@ -27,6 +27,19 @@ delivery_months = {
     "October": "V",
     "November": "X",
     "December": "Z",
+    1: "F",
+    2: "G",
+    3: "H",
+    4: "J",
+    5: "K",
+    6: "M",
+    7: "N",
+    8: "Q",
+    9: "U",
+    10: "V",
+    11: "X",
+    12: "Z",
+
 }
 
 
@@ -58,4 +71,4 @@ def date_offset(as_of: pd.Timestamp, maturity: pd.Timestamp, product: str) -> in
 
 def to_standard_delivery_month(maturity: datetime) -> str:
     """Returns a date converted to standard deliveries. E.g: for datetime(2025,12,3) returns 'Z25'"""
-    return delivery_months[maturity.strftime("%B")] + maturity.strftime("%y")
+    return delivery_months[int(maturity.strftime("%m"))] + maturity.strftime("%y")
