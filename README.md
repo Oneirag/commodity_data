@@ -10,8 +10,9 @@ There are specific classes also to download data in pandas dataframe format from
 * **instrument**: BL (baseload)/PK (peakload), EUA...
 * **area**: Country (ES, FR, DE...)
 * **product**: M, Q, Y, W, or D for month, quarter, year, week, day
-* **offset**,  number of relative products from each as_of to first delivery of the product 
-* **type**,  "close" for original prices, "adj_close" for continuous prices adjusted rolling to next offset at expirations, "maturity" for the starting date of the delivery period as a timestamp
+* **offset**, number of relative products from each as_of to first delivery of the product (integer)
+* **type**,  "close" for original prices, "continuous" for continuous prices adjusted rolling to next offset at
+  expirations, "maturity" for the starting date of the delivery period as a timestamp
 
 ## Default downloaded data
 See `commodity_data/downloaders/default_config.py` for the details of all default 
