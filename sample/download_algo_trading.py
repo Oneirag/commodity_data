@@ -51,6 +51,16 @@ df2.to_csv(f"{current_date}_algo_trading.csv", date_format="%Y-%m-%d", index=Fal
 
 pass
 exit(0)
+# df_plot = df2[[c for c in df2.columns if c.endswith("1_continuous")]]
+df_plot = df2.set_index("index")[[c for c in df2.columns if c.endswith("1_continuous")]]
+# Use matplotlib + mlpcursors
+import matplotlib.pyplot as plt
+import mplcursors
+
+fig = df_plot.plot()
+mplcursors.cursor(hover=True)
+plt.show()
+
 # Use plotly to plot data
 try:
     import plotly.graph_objects as go
@@ -58,4 +68,4 @@ except ModuleNotFoundError:
     print("Plotly not installed. Install plotly with pip install plotly")
     exit(-1)
 pd.options.plotting.backend = "plotly"
-df2.set_index("index")[[c for c in df2.columns if c.endswith("1_continuous")]].plot().show()
+df_plot.plot().show()
