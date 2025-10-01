@@ -11,7 +11,7 @@ There are specific classes also to download data in pandas dataframe format from
 * **area**: Country (ES, FR, DE...)
 * **product**: M, Q, Y, W, or D for month, quarter, year, week, day
 * **offset**, number of relative products from each as_of to first delivery of the product (integer)
-* **type**,  "close" for original prices, "continuous" for continuous prices adjusted rolling to next offset at
+* **type**,  "price" for original prices, "continuous" for continuous prices adjusted rolling to next offset at
   expirations, "maturity" for the starting date of the delivery period as a timestamp
 
 ## Default downloaded data
