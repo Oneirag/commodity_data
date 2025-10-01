@@ -1,5 +1,5 @@
-from pathlib import Path
 import pandas as pd
+
 from .dfmi import filter_dfmi_columns, update_dfmi_index
 
 
@@ -120,7 +120,8 @@ def continuous_price(df: pd.DataFrame,
 
     return pd.concat(results, ignore_index=True)
 
-def roll_dfmi(dfmi, level_price="close", rolled_type: str = "continous"):
+
+def roll_dfmi(dfmi, level_price="close", rolled_type: str = "continuous"):
     """Adds roll to all contracts in given dataframe multiindex. Assumes there is a level called offset"""
     price_df = filter_dfmi_columns(dfmi, type=level_price)
     index_offset = dfmi.columns.names.index("offset")

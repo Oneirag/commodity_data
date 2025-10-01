@@ -4,7 +4,7 @@ Downloads all EEX & Omip data plus CO2, Brent, Henry Hub and FX, and generates a
 import pandas as pd
 
 from commodity_data import CommodityData
-from commodity_data.utils.continous_price import roll_dfmi
+from commodity_data.utils.continuous_price import roll_dfmi
 from commodity_data.utils.contract_size import Duration, size_dfmi
 
 cdty = CommodityData()
@@ -50,3 +50,12 @@ current_date = pd.Timestamp.today().strftime("%Y%m%d")
 df2.to_csv(f"{current_date}_algo_trading.csv", date_format="%Y-%m-%d", index=False)
 
 pass
+exit(0)
+# Use plotly to plot data
+try:
+    import plotly.graph_objects as go
+except ModuleNotFoundError:
+    print("Plotly not installed. Install plotly with pip install plotly")
+    exit(-1)
+pd.options.plotting.backend = "plotly"
+df2.set_index("index")[[c for c in df2.columns if c.endswith("1_continuous")]].plot().show()
