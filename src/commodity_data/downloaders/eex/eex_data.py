@@ -6,11 +6,10 @@ import re
 from pathlib import Path
 from typing import List
 
-import pandas
 import pandas as pd
 from bs4 import BeautifulSoup
 
-from commodity_data.downloaders.base_downloader import HttpGet
+from commodity_data.downloaders.base_downloader import _HttpGet
 from commodity_data.downloaders.products import to_standard_delivery_month
 from commodity_data.globals import logger
 
@@ -25,7 +24,7 @@ def get_js_var(var_name: str, where: str) -> str:
     return ""
 
 
-class EEXData(HttpGet):
+class EEXData(_HttpGet):
     """Class to get market data from eex"""
 
     format_year_month_day = "%Y/%m/%d"  # Date format of other date: year/month/day
@@ -44,8 +43,15 @@ class EEXData(HttpGet):
         cache = self.load_check_cache() if not force_download_config else dict()
         self.cache_valid = cache.get('valid', False)
         self.cache_df = cache.get('df', None)
-        self.market_config_df = self.get_market_futures_config_df()
-        self.logger.debug(self.market_config_df.to_string())
+        self.__cached_market_config_df = None
+
+    @property
+    def market_config_df(self):
+        """Cached version of the market_config, as it is not needed unless you want to download something"""
+        if not self.__cached_market_config_df:
+            self.__cached_market_config_df = self.get_market_futures_config_df()
+            self.logger.debug(self.__cached_market_config_df.to_string())
+        return self.__cached_market_config_df
 
     def js_request_results(self, url: str, params: dict, headers: dict = None) -> dict:
         self.headers = {
@@ -110,7 +116,7 @@ class EEXData(HttpGet):
                 snippet = soup.find(id=f"snippet-{snippet_id}")
                 fields = snippet.find_all("field")
                 column_mapping = {field['name']: field['description'] for field in fields}
-                script = snippet.find("script")
+                script = snippet.find("script") or snippet.find_next("script")
                 all_symbols = set(re.findall(r"(\w*)Symbols_", script.text))
                 deliveries = get_js_var("buttons", script.text)
                 for symbol in all_symbols:
@@ -244,7 +250,7 @@ class EEXData(HttpGet):
                 df[c] = pd.to_datetime(df[c], format=self.format_month_day_year)
         return df
 
-    def get_eex_config_df(self, market: str = None, delivery=None, type_=None) -> pandas.DataFrame:
+    def get_eex_config_df(self, market: str = None, delivery=None, type_=None) -> pd.DataFrame:
         """Gets a filtered DataFrame with market, delivery, type and code columns
          of the EEX market symbol according to the given description (will return markets with that
          contain the given market, case-insensitive)
@@ -264,7 +270,7 @@ class EEXData(HttpGet):
 
     def get_eex_symbol(self, market: str, delivery=None, type_=None) -> List[str]:
         """Gets a list of the EEX market symbols according to the given description (will return markets with that
-         contain the given market, case insensitive)
+         contain the given market, case-insensitive)
          regular expression) and optionally delivery and type (base/peak)"""
         df = self.get_eex_config_df(market, delivery, type_)
         return df['code'].to_list()

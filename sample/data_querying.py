@@ -37,9 +37,12 @@ cdty = CommodityData()
 ###
 date_from = pd.Timestamp.today().normalize() - pd.offsets.YearBegin(10)  # Since start of year-5
 full_data = cdty.data(date_from)
+offsets_1_2 = full_data.loc[:, full_data.columns.get_level_values('offset').isin([1,2])]
+
 print(full_data.head(5))
+
 # Save it to a CSV file, in tabular format (for a standard database table)
-tabular_data = cdty.data_stack(date_from, market=["EEX", "Omip"])
+tabular_data = cdty.data_stack(date_from, market=["EEX", "Omip", "Barchart"])
 tabular_data.to_csv("all_data.csv")
 
 ###

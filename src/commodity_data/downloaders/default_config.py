@@ -1,4 +1,5 @@
 import pandas as pd
+from commodity_data.downloaders.products import to_standard_delivery_month
 
 default_config = {
     "Omip": [
@@ -64,6 +65,47 @@ default_config = {
             }
             for year in range(2013, pd.Timestamp.today().year + 4)
         ],
+        ###################
+        # ICE Brent futures
+        ###################
+        *[
+            {
+                "download_cfg": {
+                    "symbol": "CB{}".format(to_standard_delivery_month(month_date)),
+                    "expiry": month_date,
+                    "product": "M",
+                },
+                "commodity_cfg": {
+                    "commodity": "Oil",
+                    "instrument": "Brent",
+                    "area": "EU",
+                },
+            }
+            for month_date in pd.date_range("2013-01-01", 
+                                            pd.Timestamp.today().normalize() + pd.offsets.MonthBegin(3),
+                                            freq="MS")
+        ],
+        ###################
+        # Henry Hub futures
+        ###################
+        *[
+            {
+                "download_cfg": {
+                    "symbol": "NG{}".format(to_standard_delivery_month(month_date)),
+                    "expiry": month_date,
+                    "product": "M",
+                },
+                "commodity_cfg": {
+                    "commodity": "Gas",
+                    "instrument": "HH",
+                    "area": "US",
+                },
+            }
+            for month_date in pd.date_range("2013-01-01", 
+                                            pd.Timestamp.today().normalize() + pd.offsets.MonthBegin(3),
+                                            freq="MS")
+        ],
+        
         ######################
         # Cryptocurrencies
         ######################
@@ -151,12 +193,33 @@ default_config = {
                 },
             }
             for instrument, product in [
-                ("/E.FEBY", "Y"),        # Spanish Baseload year
-                ("/E.FEBM", "M"),        # Spanish Baseload month
-                ("/E.FEBQ", "Q"),        # Spanish Baseload Quarter
-                ("/E.FE_DAILY", "D"),    # Spanish Baseload Day
+                ("/E.FEBY", "Y"),  # Spanish Baseload year
+                ("/E.FEBM", "M"),  # Spanish Baseload month
+                ("/E.FEBQ", "Q"),  # Spanish Baseload Quarter
+                ("/E.FE_DAILY", "D"),  # Spanish Baseload Day
                 ("/E.FEB_WEEK", "W"),  # Spanish Baseload Week
+            ]
+        ]
+    ],
+    "Esios": [
+        *[{
+            "commodity_cfg": {
+                "commodity": "Power", "instrument": "BL", "area": area,
+            },
+            "download_cfg": {
+                "indicator": 600, "column": column,
+            }
+        }
+            for area, column in [
+                ("ES", "España"),
+                ("FR", "Francia"),
+                ("DE", "Alemania"),
+                ("PT", "Portugal"),
             ]
         ]
     ]
 }
+
+if __name__ == "__main__":
+    import pprint
+    pprint.pprint(default_config)

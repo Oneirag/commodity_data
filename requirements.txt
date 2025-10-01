@@ -6,9 +6,10 @@ beautifulsoup4      # for parsing html files
 lxml                # for parsing html files
 html5lib            # for parsing html files
 matplotlib #~=3.3.0   # for plotting
-mplcursors~=0.3     # For having tooltips in charts
-ong_utils   #@git+https://github.com/Oneirag/ong_utils.git#develop
-ong_tsdb@git+https://github.com/Oneirag/ong_tsdb.git
+mplcursors #~=0.3     # For having tooltips in charts
+ong_utils
+ong_tsdb@git+https://github.com/Oneirag/ong_tsdb.git        # Should be newer than 0.6.1 to work with QH data
+ong_esios@git+https://github.com/Oneirag/ong_esios.git      # For spot price
 
 marshmallow-dataclass      # For validation of json schemas for configuration
 marshmallow

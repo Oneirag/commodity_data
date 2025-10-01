@@ -58,7 +58,7 @@ if __name__ == '__main__':
     code. 
     """
     market_code = eex.get_eex_symbol("Liquid Milk", delivery="Month")[0]
-    maturity = pd.Timestamp(2024, 4, 1)     # May 25
+    maturity = pd.Timestamp.today().normalize() + pd.offsets.BMonthBegin(1)
     # Option 1: Get the price code downloading data for a simple day and parsing results
     price_code1 = eex.get_eex_price_symbol(market_code, maturity)
     # Option 2. Built it using month future code plus two-digit year

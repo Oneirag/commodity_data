@@ -24,12 +24,12 @@ class OmipDownloader(BaseDownloader):
         self.omip = OmipData()
 
     def min_date(self):
-        return self.__min_date
+        return self.__min_date.tz_localize(self.local_tz)
 
     def _download_date(self, as_of: pd.Timestamp) -> pd.DataFrame:
         dfs = list()
         # for cdty, cdty_config in OmipConfig.commodity_config.items():
-        for cfg in self.iter_download_config():
+        for cfg in self._iter_download_config():
             cdty = cfg.commodity_cfg.commodity
             self.logger.info(f"Downloading Omip as of {self.as_of_str(as_of)} for {cdty}")
             df = self.omip.download_omip_data(self.as_of_str(as_of), **cfg.download_cfg.__dict__)
@@ -41,7 +41,7 @@ class OmipDownloader(BaseDownloader):
             df['market'] = self.name()
             df['type'] = TypeColumn.close.value
             df['maturity'] = df['maturity'].apply(lambda x: x.timestamp())
-            df = self.pivot_table(df, value_columns=['close', 'maturity'])
+            df = self._pivot_table(df, value_columns=['close', 'maturity'])
             dfs.append(df)
         if dfs:
             return pd.concat(dfs, axis=1)

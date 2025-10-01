@@ -6,10 +6,10 @@ Examples:
     Omip    Emissions   EUA         Eu              Y           ---
     Omip    Gas         Base        Es              MQY         ---
 """
+import abc
 import datetime
 from dataclasses import field
 from enum import Enum
-
 from marshmallow.validate import OneOf
 from marshmallow_dataclass import dataclass
 
@@ -52,6 +52,16 @@ class _BaseDownloadConfig:
 
 
 @dataclass
+class _BaseCommodityConfig:
+    commodity_cfg: CommodityCfg
+
+    @abc.abstractmethod
+    def id(self) -> str:
+        """Should return a unique str"""
+        pass
+
+
+@dataclass
 class _OmipDownloadConfig(_BaseDownloadConfig):
     instrument: str
     zone: str
@@ -67,8 +77,7 @@ class _BarchartDownloadConfig(_BaseDownloadConfig):
 
 
 @dataclass
-class BarchartConfig:
-    commodity_cfg: CommodityCfg
+class BarchartConfig(_BaseCommodityConfig):
     download_cfg: _BarchartDownloadConfig
 
     def id(self) -> str:
@@ -80,8 +89,7 @@ class BarchartConfig:
 
 
 @dataclass
-class OmipConfig:
-    commodity_cfg: CommodityCfg
+class OmipConfig(_BaseCommodityConfig):
     download_cfg: _OmipDownloadConfig
 
     def id(self) -> str:
@@ -95,9 +103,22 @@ class _EEXDownloadConfig(_BaseDownloadConfig):
 
 
 @dataclass
-class EEXConfig:
-    commodity_cfg: CommodityCfg
+class EEXConfig(_BaseCommodityConfig):
     download_cfg: _EEXDownloadConfig
 
     def id(self) -> str:
         return self.download_cfg.instrument
+
+
+@dataclass
+class _EsiosDownloadConfig(_BaseDownloadConfig):
+    indicator: int
+    column: str
+
+
+@dataclass
+class ESiosConfig(_BaseCommodityConfig):
+    download_cfg: _EsiosDownloadConfig
+
+    def id(self) -> str:
+        return f"{self.download_cfg.indicator}-{self.download_cfg.column}"
