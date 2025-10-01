@@ -1,21 +1,22 @@
 import abc
-import holidays
 import logging
-import marshmallow_dataclass
 import multiprocessing.pool
+import time
+
+import holidays
+import marshmallow_dataclass
 import numpy as np
+import ong_tsdb.exceptions
 import pandas as pd
 import pandas.core.dtypes.dtypes
 import pyotp
-import time
+from ong_tsdb.client import OngTsdbClient
 from ong_utils import is_debugging, cookies2header, OngTimer
 
-import ong_tsdb.exceptions
 from commodity_data.downloaders.continuous_prices import calculate_continuous_prices
 from commodity_data.downloaders.default_config import default_config
 from commodity_data.downloaders.series_config import df_index_columns, TypeColumn
 from commodity_data.globals import config, logger, http, get_password
-from ong_tsdb.client import OngTsdbClient
 
 pd.options.mode.chained_assignment = 'raise'  # Raises SettingWithCopyWarning error instead of just warning
 
@@ -616,6 +617,11 @@ class BaseDownloader(_HttpGet):
                 read_data.index = read_data.index.tz_localize(self.local_tz)
             if self.is_daily_data:
                 read_data.index = read_data.index.normalize()
+            # Change type of offset from float to integer
+            read_data.columns = read_data.columns.set_levels(
+                read_data.columns.levels[read_data.columns.names.index('offset')].astype(int),
+                level='offset'
+            )
             self.__settlement_df = read_data.astype(str).astype(np.float64)
             self.__settlement_df.sort_index(inplace=True)
             self.__settlement_df.sort_index(inplace=True, axis=1)
