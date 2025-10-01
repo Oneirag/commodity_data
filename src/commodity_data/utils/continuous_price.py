@@ -6,7 +6,8 @@ from .dfmi import filter_dfmi_columns, update_dfmi_index
 def roll_price(price_offset_1: pd.Series, price_offset_2: pd.Series, maturity: pd.Series) -> pd.Series:
     """Returns a new Series with the rolled price. Prices should be in ascending order. Maturity is the maturity of first price offset"""
     adjust = pd.Series(0.0, index=price_offset_1.index)
-    prev_price_target = price_offset_1.shift()
+    # Add ffill so in case lack of prices in offset 1 up to 5 previous days are used
+    prev_price_target = price_offset_1.ffill(limit=5).shift()
     prev_price_other = price_offset_2.shift()
     
     roll_day = maturity != maturity.shift()
